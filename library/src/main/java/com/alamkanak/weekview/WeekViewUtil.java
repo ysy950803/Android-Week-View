@@ -16,6 +16,7 @@ public class WeekViewUtil {
 
     /**
      * Checks if two times are on the same day.
+     *
      * @param dayOne The first day.
      * @param dayTwo The second day.
      * @return Whether the times are on the same day.
@@ -26,9 +27,10 @@ public class WeekViewUtil {
 
     /**
      * Returns a calendar instance at the start of this day
+     *
      * @return the calendar instance
      */
-    public static Calendar today(){
+    public static Calendar today() {
         Calendar today = Calendar.getInstance();
         today.set(Calendar.HOUR_OF_DAY, 0);
         today.set(Calendar.MINUTE, 0);
