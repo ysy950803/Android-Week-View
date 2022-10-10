@@ -57,6 +57,33 @@
     </RelativeLayout>
 
     <com.alamkanak.weekview.WeekHeaderView
+        android:id="@+id/weekHeaderView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:allDayEventHeight="24dp"
+        app:columnGap="2dp"
+        app:dayBackgroundColor="@android:color/white"
+        app:eventPadding="2dp"
+        app:eventTextColor="@color/color_C54E00"
+        app:eventTextSize="14sp"
+        app:headerColumnBackground="@android:color/white"
+        app:headerColumnPadding="8dp"
+        app:headerColumnTextColor="#FF333333"
+        app:headerRowBackgroundColor="@android:color/white"
+        app:headerRowPadding="0dp"
+        app:hourHeight="44dp"
+        app:hourSeparatorColor="#FFEBEBEB"
+        app:hourSeparatorHeight="1px"
+        app:noOfVisibleDays="3"
+        app:nowLineColor="#FFFD813C"
+        app:nowLineThickness="1dp"
+        app:showNowLine="true"
+        app:textSize="12sp"
+        app:todayBackgroundColor="#FFFBFBFB"
+        app:todayHeaderTextColor="@color/accent"
+        app:xScrollingSpeed="0.75" />
+
+    <com.alamkanak.weekview.WeekView
         android:id="@+id/weekView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -80,6 +107,7 @@
         app:showNowLine="true"
         app:textSize="12sp"
         app:todayBackgroundColor="#FFFBFBFB"
-        app:todayHeaderTextColor="@color/accent" />
+        app:todayHeaderTextColor="@color/accent"
+        app:xScrollingSpeed="0.75" />
 
 </LinearLayout>

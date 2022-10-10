@@ -1,6 +1,7 @@
 package com.alamkanak.weekview;
 
 import java.util.Calendar;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by jesse on 6/02/2016.
@@ -37,5 +38,16 @@ public class WeekViewUtil {
         today.set(Calendar.SECOND, 0);
         today.set(Calendar.MILLISECOND, 0);
         return today;
+    }
+
+    // TODO 暂时只适用于全天日程
+    public static int daysBetween(Calendar dayOne, Calendar dayTwo) {
+        return (int) Math.ceil((dayTwo.getTimeInMillis() - dayOne.getTimeInMillis()) * 1f / TimeUnit.DAYS.toMillis(1));
+    }
+    
+    public static boolean isContainsAllDay(Calendar day, WeekViewEvent event) {
+        return day.getTimeInMillis() <= event.getEndTime().getTimeInMillis()
+                && event.getStartTime().getTimeInMillis() <= day.getTimeInMillis()
+                && event.isAllDay();
     }
 }

@@ -1,5 +1,7 @@
 package com.alamkanak.weekview;
 
+import static com.alamkanak.weekview.WeekViewUtil.daysBetween;
+import static com.alamkanak.weekview.WeekViewUtil.isContainsAllDay;
 import static com.alamkanak.weekview.WeekViewUtil.isSameDay;
 import static com.alamkanak.weekview.WeekViewUtil.today;
 
@@ -13,7 +15,6 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.graphics.drawable.Drawable;
 import android.text.Layout;
 import android.text.SpannableStringBuilder;
 import android.text.StaticLayout;
@@ -23,16 +24,17 @@ import android.text.format.DateFormat;
 import android.text.format.DateUtils;
 import android.text.style.StyleSpan;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
-import android.view.ScaleGestureDetector;
 import android.view.SoundEffectConstants;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.OverScroller;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GestureDetectorCompat;
@@ -70,24 +72,17 @@ public class WeekHeaderView extends View {
     private float mTimeTextWidth;
     private float mTimeTextHeight;
     private Paint mHeaderTextPaint;
-    private Paint mOldHeaderTextPaint, mOldHasEventPaint;
+    private Paint mPastHeaderTextPaint, mPastHasEventPaint;
     private float mHeaderHeight;
     private GestureDetectorCompat mGestureDetector;
     private OverScroller mScroller;
     private final PointF mCurrentOrigin = new PointF(0f, 0f);
     private Direction mCurrentScrollDirection = Direction.NONE;
     private Paint mHeaderBackgroundPaint;
-    private Drawable mHeaderBottomBorderDrawable;
     private float mWidthPerDay;
     private Paint mDayBackgroundPaint;
-    private Paint mHourSeparatorPaint;
     private float mHeaderMarginBottom;
     private Paint mTodayBackgroundPaint;
-    private Paint mFutureBackgroundPaint;
-    private Paint mPastBackgroundPaint;
-    private Paint mFutureWeekendBackgroundPaint;
-    private Paint mPastWeekendBackgroundPaint;
-    private Paint mNowLinePaint, mNowLineOtherPaint;
     private Paint mTodayHeaderTextPaint;
     private Paint mEventBackgroundPaint;
     private Paint mEventBorderPaint;
@@ -101,8 +96,6 @@ public class WeekHeaderView extends View {
     private int mFetchedPeriod = -1; // the middle period the calendar has fetched.
     private boolean mRefreshEvents = false;
     private Direction mCurrentFlingDirection = Direction.NONE;
-    private ScaleGestureDetector mScaleDetector;
-    private boolean mIsZooming;
     private Calendar mFirstVisibleDay;
     private Calendar mLastVisibleDay;
     private boolean mShowFirstDayOfWeekFirst = false;
@@ -111,10 +104,6 @@ public class WeekHeaderView extends View {
     private int mScaledTouchSlop = 0;
     // Attributes and their default values.
     private int mHourHeight = 50;
-    private int mNewHourHeight = -1;
-    private int mMinHourHeight = 0; //no minimum specified (will be dynamic, based on screen)
-    private int mEffectiveMinHourHeight; //compensates for the fact that you can't keep zooming out.
-    private int mMaxHourHeight = 250;
     private int mColumnGap = 10;
     private int mFirstDayOfWeek = Calendar.MONDAY;
     private int mTextSize = 12;
@@ -123,15 +112,9 @@ public class WeekHeaderView extends View {
     private int mNumberOfVisibleDays = 3;
     private int mHeaderRowBackgroundColor = Color.WHITE;
     private int mDayBackgroundColor = Color.rgb(245, 245, 245);
-    private int mPastBackgroundColor = Color.rgb(227, 227, 227);
-    private int mFutureBackgroundColor = Color.rgb(245, 245, 245);
-    private final int mPastWeekendBackgroundColor;
-    private final int mFutureWeekendBackgroundColor;
     private int mNowLineColor = Color.rgb(102, 102, 102);
     private int mNowLineThickness = 5;
-    private int mHourSeparatorColor = Color.rgb(230, 230, 230);
     private int mTodayBackgroundColor = Color.rgb(239, 247, 254);
-    private int mHourSeparatorHeight = 2;
     private int mTodayHeaderTextColor = Color.rgb(39, 137, 228);
     private int mEventTextSize = 12;
     private int mEventTextColor = Color.BLACK;
@@ -157,7 +140,7 @@ public class WeekHeaderView extends View {
     private int mScrollDuration = 250;
 
     // TODO 绘制过程中标记某天是否有日程
-    private final HashMap<Integer, Boolean> mDayHasEvents = new HashMap<>();
+    private HashMap<Integer, Boolean> mDayHasEvents = new HashMap<>();
     // TODO 除掉全天日程以外的header高度
     private float mNormalHeaderHeight;
 
@@ -169,6 +152,7 @@ public class WeekHeaderView extends View {
     private EmptyViewLongPressListener mEmptyViewLongPressListener;
     private DateTimeInterpreter mDateTimeInterpreter;
     private ScrollListener mScrollListener;
+    private CascadeScrollListener mCascadeScrollListener;
 
     private final GestureDetector.SimpleOnGestureListener mGestureListener = new GestureDetector.SimpleOnGestureListener() {
 
@@ -180,10 +164,6 @@ public class WeekHeaderView extends View {
 
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-            // Check if view is zoomed.
-            if (mIsZooming)
-                return true;
-
             boolean horizontal = Math.abs(distanceX) > Math.abs(distanceY);
             switch (mCurrentScrollDirection) {
                 case NONE: {
@@ -232,9 +212,6 @@ public class WeekHeaderView extends View {
 
         @Override
         public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-            if (mIsZooming)
-                return true;
-
             if ((mCurrentFlingDirection == Direction.LEFT && !mHorizontalFlingEnabled) ||
                     (mCurrentFlingDirection == Direction.RIGHT && !mHorizontalFlingEnabled) ||
                     (mCurrentFlingDirection == Direction.VERTICAL && !mVerticalFlingEnabled)) {
@@ -247,10 +224,7 @@ public class WeekHeaderView extends View {
             switch (mCurrentFlingDirection) {
                 case LEFT:
                 case RIGHT:
-                    mScroller.fling((int) mCurrentOrigin.x, (int) mCurrentOrigin.y, (int) (velocityX * mXScrollingSpeed), 0, Integer.MIN_VALUE, Integer.MAX_VALUE, (int) -(mHourHeight * 24 + mHeaderHeight + mHeaderMarginBottom + mTimeTextHeight / 2 - getHeight()), 0);
-                    break;
-                case VERTICAL:
-                    mScroller.fling((int) mCurrentOrigin.x, (int) mCurrentOrigin.y, 0, (int) velocityY, Integer.MIN_VALUE, Integer.MAX_VALUE, (int) -(mHourHeight * 24 + mHeaderHeight + mHeaderMarginBottom + mTimeTextHeight / 2 - getHeight()), 0);
+                    mScroller.fling((int) mCurrentOrigin.x, (int) mCurrentOrigin.y, (int) (velocityX * mXScrollingSpeed), 0, Integer.MIN_VALUE, Integer.MAX_VALUE, 0, 0);
                     break;
             }
 
@@ -332,9 +306,6 @@ public class WeekHeaderView extends View {
         try {
             mFirstDayOfWeek = a.getInteger(R.styleable.WeekView_firstDayOfWeek, mFirstDayOfWeek);
             mHourHeight = a.getDimensionPixelSize(R.styleable.WeekView_hourHeight, mHourHeight);
-            mMinHourHeight = a.getDimensionPixelSize(R.styleable.WeekView_minHourHeight, mMinHourHeight);
-            mEffectiveMinHourHeight = mMinHourHeight;
-            mMaxHourHeight = a.getDimensionPixelSize(R.styleable.WeekView_maxHourHeight, mMaxHourHeight);
             mTextSize = a.getDimensionPixelSize(R.styleable.WeekView_textSize, (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, mTextSize, context.getResources().getDisplayMetrics()));
             mHeaderColumnPadding = a.getDimensionPixelSize(R.styleable.WeekView_headerColumnPadding, mHeaderColumnPadding);
             mColumnGap = a.getDimensionPixelSize(R.styleable.WeekView_columnGap, mColumnGap);
@@ -343,15 +314,9 @@ public class WeekHeaderView extends View {
             mShowFirstDayOfWeekFirst = a.getBoolean(R.styleable.WeekView_showFirstDayOfWeekFirst, mShowFirstDayOfWeekFirst);
             mHeaderRowBackgroundColor = a.getColor(R.styleable.WeekView_headerRowBackgroundColor, mHeaderRowBackgroundColor);
             mDayBackgroundColor = a.getColor(R.styleable.WeekView_dayBackgroundColor, mDayBackgroundColor);
-            mFutureBackgroundColor = a.getColor(R.styleable.WeekView_futureBackgroundColor, mFutureBackgroundColor);
-            mPastBackgroundColor = a.getColor(R.styleable.WeekView_pastBackgroundColor, mPastBackgroundColor);
-            mFutureWeekendBackgroundColor = a.getColor(R.styleable.WeekView_futureWeekendBackgroundColor, mFutureBackgroundColor); // If not set, use the same color as in the week
-            mPastWeekendBackgroundColor = a.getColor(R.styleable.WeekView_pastWeekendBackgroundColor, mPastBackgroundColor);
             mNowLineColor = a.getColor(R.styleable.WeekView_nowLineColor, mNowLineColor);
             mNowLineThickness = a.getDimensionPixelSize(R.styleable.WeekView_nowLineThickness, (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, mNowLineThickness, context.getResources().getDisplayMetrics()));
-            mHourSeparatorColor = a.getColor(R.styleable.WeekView_hourSeparatorColor, mHourSeparatorColor);
             mTodayBackgroundColor = a.getColor(R.styleable.WeekView_todayBackgroundColor, mTodayBackgroundColor);
-            mHourSeparatorHeight = a.getDimensionPixelSize(R.styleable.WeekView_hourSeparatorHeight, mHourSeparatorHeight);
             mTodayHeaderTextColor = a.getColor(R.styleable.WeekView_todayHeaderTextColor, mTodayHeaderTextColor);
             mEventTextSize = a.getDimensionPixelSize(R.styleable.WeekView_eventTextSize, (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, mEventTextSize, context.getResources().getDisplayMetrics()));
             mEventTextColor = a.getColor(R.styleable.WeekView_eventTextColor, mEventTextColor);
@@ -395,7 +360,7 @@ public class WeekHeaderView extends View {
         Rect rect = new Rect();
         mTimeTextPaint.getTextBounds("00 PM", 0, "00 PM".length(), rect);
         mTimeTextHeight = rect.height();
-        mHeaderMarginBottom = mTimeTextHeight / 2;
+        mHeaderMarginBottom = ConvertUtils.dp2px(2);
         initTextTimeWidth();
 
         // Measure settings for header row.
@@ -404,46 +369,21 @@ public class WeekHeaderView extends View {
         mHeaderTextPaint.setTextAlign(Paint.Align.CENTER);
         mHeaderTextPaint.setTextSize(mTextSize);
         // TODO 过去的日期header文本
-        mOldHeaderTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        mOldHeaderTextPaint.setColor(Color.parseColor("#FF999999"));
-        mOldHeaderTextPaint.setTextAlign(Paint.Align.CENTER);
-        mOldHeaderTextPaint.setTextSize(mTextSize);
+        mPastHeaderTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mPastHeaderTextPaint.setColor(Color.parseColor("#FF999999"));
+        mPastHeaderTextPaint.setTextAlign(Paint.Align.CENTER);
+        mPastHeaderTextPaint.setTextSize(mTextSize);
         // TODO 过去的日期header是否有日程圆点
-        mOldHasEventPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        mOldHasEventPaint.setColor(Color.parseColor("#FFDDDDDD"));
+        mPastHasEventPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mPastHasEventPaint.setColor(Color.parseColor("#FFDDDDDD"));
 
         // Prepare header background paint.
         mHeaderBackgroundPaint = new Paint();
         mHeaderBackgroundPaint.setColor(mHeaderRowBackgroundColor);
-        // TODO header底部的阴影分隔线
-        mHeaderBottomBorderDrawable = ContextCompat.getDrawable(mContext, R.drawable.calendar_bottom_shadow);
 
         // Prepare day background color paint.
         mDayBackgroundPaint = new Paint();
         mDayBackgroundPaint.setColor(mDayBackgroundColor);
-        mFutureBackgroundPaint = new Paint();
-        mFutureBackgroundPaint.setColor(mFutureBackgroundColor);
-        mPastBackgroundPaint = new Paint();
-        mPastBackgroundPaint.setColor(mPastBackgroundColor);
-        mFutureWeekendBackgroundPaint = new Paint();
-        mFutureWeekendBackgroundPaint.setColor(mFutureWeekendBackgroundColor);
-        mPastWeekendBackgroundPaint = new Paint();
-        mPastWeekendBackgroundPaint.setColor(mPastWeekendBackgroundColor);
-
-        // Prepare hour separator color paint.
-        mHourSeparatorPaint = new Paint();
-        mHourSeparatorPaint.setStyle(Paint.Style.STROKE);
-        mHourSeparatorPaint.setStrokeWidth(mHourSeparatorHeight);
-        mHourSeparatorPaint.setColor(mHourSeparatorColor);
-
-        // Prepare the "now" line color paint
-        mNowLinePaint = new Paint();
-        mNowLinePaint.setStrokeWidth(mNowLineThickness);
-        mNowLinePaint.setColor(mNowLineColor);
-        mNowLineOtherPaint = new Paint();
-        mNowLineOtherPaint.setStrokeWidth(mNowLineThickness / 2f);
-        mNowLineOtherPaint.setColor(mNowLineColor);
-        mNowLineOtherPaint.setAlpha(128);
 
         // Prepare today background color paint.
         mTodayBackgroundPaint = new Paint();
@@ -475,27 +415,6 @@ public class WeekHeaderView extends View {
 
         // Set default event color.
         mDefaultEventColor = Color.parseColor("#9fc6e7");
-
-        mScaleDetector = new ScaleGestureDetector(mContext, new ScaleGestureDetector.OnScaleGestureListener() {
-            @Override
-            public void onScaleEnd(ScaleGestureDetector detector) {
-                mIsZooming = false;
-            }
-
-            @Override
-            public boolean onScaleBegin(ScaleGestureDetector detector) {
-                mIsZooming = true;
-                goToNearestOrigin();
-                return true;
-            }
-
-            @Override
-            public boolean onScale(ScaleGestureDetector detector) {
-                mNewHourHeight = Math.round(mHourHeight * detector.getScaleFactor());
-                invalidate();
-                return true;
-            }
-        });
 
         // TODO 除掉全天日程以外的header高度
         Paint headerTextPaint = mHeaderTextPaint;
@@ -532,70 +451,51 @@ public class WeekHeaderView extends View {
     }
 
     @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+        int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+        int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+        heightSize = heightMode == MeasureSpec.EXACTLY ? heightSize : (int) (Math.max(mHeaderHeight, mNormalHeaderHeight + mHeaderMarginBottom));
+        setMeasuredDimension(widthSize, heightSize);
+    }
+
+    @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
         // Draw the header row.
         drawHeaderRowAndEvents(canvas);
 
-        // Draw the time column and all the axes/separators.
-        drawTimeColumnAndAxes(canvas);
-
-        // TODO header底部的阴影分隔线
-        mHeaderBottomBorderDrawable.setBounds(
-                0, (int) (mHeaderHeight - 6),
-                getWidth(), (int) (mHeaderHeight + 6));
-        mHeaderBottomBorderDrawable.draw(canvas);
+        if (mCascadeScrollListener != null) {
+            if (mFirstVisibleDay != null && mScroller.isFinished() && Float.compare(mCurrentOrigin.x, mScroller.getFinalX()) == 0) {
+                mCascadeScrollListener.onScrollEnd(mFirstVisibleDay);
+            } else {
+                mCascadeScrollListener.onScrolling(mCurrentOrigin.x);
+            }
+        }
     }
 
     private void calculateHeaderHeight() {
         //Make sure the header is the right size (depends on AllDay events)
-        boolean containsAllDayEvent = false;
+        int maxAllDayRowCount = 0;
         if (mEventRects != null && mEventRects.size() > 0) {
             for (int dayNumber = 0;
                  dayNumber < mNumberOfVisibleDays;
                  dayNumber++) {
                 Calendar day = (Calendar) getFirstVisibleDay().clone();
                 day.add(Calendar.DATE, dayNumber);
-                for (int i = 0; i < mEventRects.size(); i++) {
-
-                    if (isSameDay(mEventRects.get(i).event.getStartTime(), day) && mEventRects.get(i).event.isAllDay()) {
-                        containsAllDayEvent = true;
-                        break;
+                for (EventRect rect : mEventRects) {
+                    if (isContainsAllDay(day, rect.event)) {
+                        maxAllDayRowCount = Math.max(maxAllDayRowCount, rect.row);
                     }
-                }
-                if (containsAllDayEvent) {
-                    break;
                 }
             }
         }
-        // TODO 判断是否有全天日程
-        if (containsAllDayEvent) {
-            mHeaderHeight = mNormalHeaderHeight + (mAllDayEventHeight + mHeaderMarginBottom);
-        } else {
-            mHeaderHeight = mNormalHeaderHeight + mHeaderMarginBottom;
+        mHeaderHeight = mNormalHeaderHeight + mHeaderMarginBottom + mAllDayEventHeight * maxAllDayRowCount;
+        if (mHeaderHeight != getMeasuredHeight()) {
+            requestLayout();
         }
-    }
-
-    private void drawTimeColumnAndAxes(Canvas canvas) {
-        // Draw the background color for the header column.
-        canvas.drawRect(0, mHeaderHeight, mHeaderColumnWidth, getHeight(), mHeaderColumnBackgroundPaint);
-
-        // Clip to paint in left column only.
-        canvas.save();
-        canvas.clipRect(0, mHeaderHeight, mHeaderColumnWidth, getHeight());
-
-        for (int i = 0; i < 24; i++) {
-            float top = mHeaderHeight + mCurrentOrigin.y + mHourHeight * i + mHeaderMarginBottom;
-
-            // Draw the text if its y position is not outside of the visible area. The pivot point of the text is the point at the bottom-right corner.
-            String time = getDateTimeInterpreter().interpretTime(i);
-            if (time == null)
-                throw new IllegalStateException("A DateTimeInterpreter must not return null time");
-            if (top < getHeight())
-                canvas.drawText(time, mTimeTextWidth + mHeaderColumnPadding, top + mTimeTextHeight, mTimeTextPaint);
-        }
-        canvas.restore();
     }
 
     private void drawHeaderRowAndEvents(Canvas canvas) {
@@ -609,8 +509,6 @@ public class WeekHeaderView extends View {
         Calendar today = today();
 
         if (mAreDimensionsInvalid) {
-            mEffectiveMinHourHeight = Math.max(mMinHourHeight, (int) ((getHeight() - mHeaderHeight - mHeaderMarginBottom) / 24));
-
             mAreDimensionsInvalid = false;
             if (mScrollToDay != null)
                 goToDate(mScrollToDay);
@@ -633,18 +531,6 @@ public class WeekHeaderView extends View {
             }
         }
 
-        // Calculate the new height due to the zooming.
-        if (mNewHourHeight > 0) {
-            if (mNewHourHeight < mEffectiveMinHourHeight)
-                mNewHourHeight = mEffectiveMinHourHeight;
-            else if (mNewHourHeight > mMaxHourHeight)
-                mNewHourHeight = mMaxHourHeight;
-
-            mCurrentOrigin.y = (mCurrentOrigin.y / mHourHeight) * mNewHourHeight;
-            mHourHeight = mNewHourHeight;
-            mNewHourHeight = -1;
-        }
-
         // If the new mCurrentOrigin.y is invalid, make it valid.
         if (mCurrentOrigin.y < getHeight() - mHourHeight * 24 - mHeaderHeight - mHeaderMarginBottom - mTimeTextHeight / 2)
             mCurrentOrigin.y = getHeight() - mHourHeight * 24 - mHeaderHeight - mHeaderMarginBottom - mTimeTextHeight / 2;
@@ -665,21 +551,12 @@ public class WeekHeaderView extends View {
         Calendar day = (Calendar) today.clone();
         day.add(Calendar.HOUR, 6);
 
-        // Prepare to iterate for each hour to draw the hour lines.
-        int lineCount = (int) ((getHeight() - mHeaderHeight - mHeaderMarginBottom) / mHourHeight) + 1;
-        lineCount = (lineCount) * (mNumberOfVisibleDays + 1);
-        float[] hourLines = new float[lineCount * 4];
-
         // Clear the cache for event rectangles.
         if (mEventRects != null) {
             for (EventRect eventRect : mEventRects) {
                 eventRect.rectF = null;
             }
         }
-
-        // Clip to paint events only.
-        canvas.save();
-        canvas.clipRect(mHeaderColumnWidth, mHeaderHeight, getWidth(), getHeight());
 
         // Iterate through each day.
         Calendar oldFirstVisibleDay = mFirstVisibleDay;
@@ -689,8 +566,6 @@ public class WeekHeaderView extends View {
             mScrollListener.onFirstVisibleDayChanged(mFirstVisibleDay, oldFirstVisibleDay);
         }
 
-        mDayHasEvents.clear();
-        float nowLineY = getNowLineY();
         for (int dayNumber = leftDaysWithGaps + 1;
              dayNumber <= leftDaysWithGaps + mNumberOfVisibleDays + 1;
              dayNumber++) {
@@ -700,7 +575,6 @@ public class WeekHeaderView extends View {
             mLastVisibleDay = (Calendar) day.clone();
             day.add(Calendar.DATE, dayNumber - 1);
             mLastVisibleDay.add(Calendar.DATE, dayNumber - 2);
-            boolean sameDay = isSameDay(day, today);
 
             // Get more events if necessary. We want to store the events 3 months beforehand. Get
             // events only when it is the first iteration of the loop.
@@ -711,66 +585,12 @@ public class WeekHeaderView extends View {
                 mRefreshEvents = false;
             }
 
-            // Draw background color for each day.
-            float start = Math.max(startPixel, mHeaderColumnWidth);
-            if (mWidthPerDay + startPixel - start > 0) {
-                if (mShowDistinctPastFutureColor) {
-                    boolean isWeekend = day.get(Calendar.DAY_OF_WEEK) == Calendar.SATURDAY || day.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY;
-                    Paint pastPaint = isWeekend && mShowDistinctWeekendColor ? mPastWeekendBackgroundPaint : mPastBackgroundPaint;
-                    Paint futurePaint = isWeekend && mShowDistinctWeekendColor ? mFutureWeekendBackgroundPaint : mFutureBackgroundPaint;
-                    float startY = mHeaderHeight + mTimeTextHeight / 2 + mHeaderMarginBottom + mCurrentOrigin.y;
-
-                    if (sameDay) {
-                        Calendar now = Calendar.getInstance();
-                        float beforeNow = (now.get(Calendar.HOUR_OF_DAY) + now.get(Calendar.MINUTE) / 60.0f) * mHourHeight;
-                        canvas.drawRect(start, startY, startPixel + mWidthPerDay, startY + beforeNow, pastPaint);
-                        canvas.drawRect(start, startY + beforeNow, startPixel + mWidthPerDay, getHeight(), futurePaint);
-                    } else if (day.before(today)) {
-                        canvas.drawRect(start, startY, startPixel + mWidthPerDay, getHeight(), pastPaint);
-                    } else {
-                        canvas.drawRect(start, startY, startPixel + mWidthPerDay, getHeight(), futurePaint);
-                    }
-                } else {
-                    // TODO 今天背景色高度
-                    canvas.drawRect(start, mHeaderHeight, startPixel + mWidthPerDay, getHeight(), sameDay ? mTodayBackgroundPaint : mDayBackgroundPaint);
-                }
-            }
-
-            // Prepare the separator lines for hours.
-            int i = 0;
-            for (int hourNumber = 0; hourNumber < 24; hourNumber++) {
-                float top = mHeaderHeight + mCurrentOrigin.y + mHourHeight * hourNumber + mTimeTextHeight / 2 + mHeaderMarginBottom;
-                if (top > mHeaderHeight + mTimeTextHeight / 2 + mHeaderMarginBottom - mHourSeparatorHeight && top < getHeight() && startPixel + mWidthPerDay - start > 0) {
-                    hourLines[i * 4] = start;
-                    hourLines[i * 4 + 1] = top;
-                    hourLines[i * 4 + 2] = startPixel + mWidthPerDay;
-                    hourLines[i * 4 + 3] = top;
-                    i++;
-                }
-            }
-
-            // Draw the lines for hours.
-            canvas.drawLines(hourLines, mHourSeparatorPaint);
-
             // Draw the events.
-            boolean hasEvent = drawEvents(day, startPixel, canvas);
-            mDayHasEvents.put(dayNumber, hasEvent);
-
-            // Draw the line at the current time.
-            if (mShowNowLine && sameDay) {
-                canvas.drawLine(start, nowLineY, startPixel + mWidthPerDay, nowLineY, mNowLinePaint);
-                // TODO 时间游标圆点
-                if (startPixel >= mHeaderColumnWidth) {
-                    float radius = ConvertUtils.dp2px(3);
-                    canvas.drawCircle(start + radius, nowLineY, radius, mNowLinePaint);
-                }
-            }
+            mDayHasEvents.put(dayNumber, Boolean.TRUE.equals(mDayHasEvents.get(dayNumber)) || hasEvents(day));
 
             // In the next iteration, start from the next day.
             startPixel += mWidthPerDay + mColumnGap;
         }
-        canvas.drawLine(mHeaderColumnWidth, nowLineY, mHeaderColumnWidth + mWidthPerDay * mNumberOfVisibleDays, nowLineY, mNowLineOtherPaint);
-        canvas.restore();
 
         // Hide everything in the first cell (top left corner).
         canvas.save();
@@ -805,7 +625,7 @@ public class WeekHeaderView extends View {
                 throw new IllegalStateException("A DateTimeInterpreter must not return null date");
 
             // TODO 周三
-            Paint headerTextPaint = sameDay ? mTodayHeaderTextPaint : (dayNumber < 1 ? mOldHeaderTextPaint : mHeaderTextPaint);
+            Paint headerTextPaint = sameDay ? mTodayHeaderTextPaint : (dayNumber < 1 ? mPastHeaderTextPaint : mHeaderTextPaint);
             headerTextPaint.setTypeface(Typeface.DEFAULT);
             headerTextPaint.setTextSize(mTextSize);
             Paint.FontMetrics fontMetrics = headerTextPaint.getFontMetrics();
@@ -820,13 +640,14 @@ public class WeekHeaderView extends View {
             // TODO 是否有日程的圆点
             if (Boolean.TRUE.equals(mDayHasEvents.get(dayNumber))) {
                 canvas.drawCircle(startPixel + mWidthPerDay / 2, label1Height + ConvertUtils.dp2px(6),
-                        ConvertUtils.dp2px(2), dayNumber < 1 ? mOldHasEventPaint : mTodayHeaderTextPaint);
+                        ConvertUtils.dp2px(2), dayNumber < 1 ? mPastHasEventPaint : mTodayHeaderTextPaint);
             }
 
-            drawAllDayEvents(day, startPixel, mNormalHeaderHeight, canvas);
             startPixel += mWidthPerDay + mColumnGap;
         }
         canvas.restore();
+
+        drawAllDayEvents(canvas);
     }
 
     /**
@@ -862,111 +683,41 @@ public class WeekHeaderView extends View {
     /**
      * Draw all the events of a particular day.
      *
-     * @param date           The day.
-     * @param startFromPixel The left position of the day area. The events will never go any left from this value.
-     * @param canvas         The canvas to draw upon.
+     * @param date The day.
      * @return 此日是否有日程（包括全天）
      */
-    private boolean drawEvents(Calendar date, float startFromPixel, Canvas canvas) {
+    private boolean hasEvents(Calendar date) {
         boolean hasEvent = false;
         if (mEventRects != null && mEventRects.size() > 0) {
-            for (int i = 0; i < mEventRects.size(); i++) {
-                boolean sameDay = isSameDay(mEventRects.get(i).event.getStartTime(), date);
-                hasEvent = sameDay || hasEvent;
-                if (sameDay && !mEventRects.get(i).event.isAllDay()) {
-                    // Calculate top.
-                    float top = mHourHeight * 24 * mEventRects.get(i).top / 1440 + mCurrentOrigin.y + mHeaderHeight + mHeaderMarginBottom + mTimeTextHeight / 2 + mEventMarginVertical;
-
-                    // Calculate bottom.
-                    float bottom = mEventRects.get(i).bottom;
-                    bottom = mHourHeight * 24 * bottom / 1440 + mCurrentOrigin.y + mHeaderHeight + mHeaderMarginBottom + mTimeTextHeight / 2 - mEventMarginVertical;
-
-                    // Calculate left and right.
-                    float left = startFromPixel + mEventRects.get(i).left * mWidthPerDay;
-                    if (left < startFromPixel)
-                        left += mOverlappingEventGap;
-                    float right = left + mEventRects.get(i).width * mWidthPerDay;
-                    if (right < startFromPixel + mWidthPerDay)
-                        right -= mOverlappingEventGap;
-
-                    // Draw the event and the event name on top of it.
-                    if (left < right &&
-                            left < getWidth() &&
-                            top < getHeight() &&
-                            right > mHeaderColumnWidth &&
-                            bottom > mHeaderHeight + mTimeTextHeight / 2 + mHeaderMarginBottom
-                    ) {
-                        mEventRects.get(i).rectF = new RectF(left, top, right, bottom);
-                        mEventBackgroundPaint.setColor(mEventRects.get(i).event.getColor() == 0 ? mDefaultEventColor : mEventRects.get(i).event.getColor());
-                        canvas.drawRoundRect(mEventRects.get(i).rectF, mEventCornerRadius, mEventCornerRadius, mEventBackgroundPaint);
-
-                        // TODO 日程左侧装饰边界线
-                        canvas.drawRect(
-                                mEventRects.get(i).rectF.left,
-                                mEventRects.get(i).rectF.top,
-                                mEventRects.get(i).rectF.left + ConvertUtils.dp2px(2),
-                                mEventRects.get(i).rectF.bottom,
-                                mEventBorderPaint);
-
-                        drawEventTitle(mEventRects.get(i).event, mEventRects.get(i).rectF, canvas, top, left);
-                    } else
-                        mEventRects.get(i).rectF = null;
-                }
+            for (EventRect rect : mEventRects) {
+                hasEvent = isContainsAllDay(date, rect.event) || hasEvent;
             }
         }
         return hasEvent;
     }
 
+    public void setDayHasEvents(HashMap<Integer, Boolean> dayHasEvents) {
+        this.mDayHasEvents = dayHasEvents;
+    }
+
     /**
      * Draw all the Allday-events of a particular day.
      *
-     * @param date           The day.
-     * @param startFromPixel The left position of the day area. The events will never go any left from this value.
-     * @param top            全天日程开始绘制的top
-     * @param canvas         The canvas to draw upon.
+     * @param canvas The canvas to draw upon.
      */
-    private void drawAllDayEvents(Calendar date, float startFromPixel, float top, Canvas canvas) {
+    private void drawAllDayEvents(Canvas canvas) {
+        canvas.save();
+        canvas.clipRect(mHeaderColumnWidth, 0, getWidth(), mHeaderHeight - mHeaderMarginBottom);
         if (mEventRects != null && mEventRects.size() > 0) {
-            for (int i = 0; i < mEventRects.size(); i++) {
-                if (isSameDay(mEventRects.get(i).event.getStartTime(), date) && mEventRects.get(i).event.isAllDay()) {
-                    // Calculate bottom.
-                    float bottom = top + mEventRects.get(i).bottom;
-
-                    // Calculate left and right.
-                    float left = startFromPixel + mEventRects.get(i).left * mWidthPerDay;
-                    if (left < startFromPixel)
-                        left += mOverlappingEventGap;
-                    float right = left + mEventRects.get(i).width * mWidthPerDay;
-                    if (right < startFromPixel + mWidthPerDay)
-                        right -= mOverlappingEventGap;
-
-                    // Draw the event and the event name on top of it.
-                    if (left < right &&
-                            left < getWidth() &&
-                            top < getHeight() &&
-                            right > mHeaderColumnWidth &&
-                            bottom > 0
-                    ) {
-                        mEventRects.get(i).rectF = new RectF(left, top, right, bottom);
-                        mEventBackgroundPaint.setColor(mEventRects.get(i).event.getColor() == 0 ? mDefaultEventColor : mEventRects.get(i).event.getColor());
-                        canvas.drawRoundRect(mEventRects.get(i).rectF, mEventCornerRadius, mEventCornerRadius, mEventBackgroundPaint);
-
-                        // TODO 全天日程左侧装饰边界线
-                        canvas.drawRect(
-                                mEventRects.get(i).rectF.left,
-                                mEventRects.get(i).rectF.top,
-                                mEventRects.get(i).rectF.left + ConvertUtils.dp2px(2),
-                                mEventRects.get(i).rectF.bottom,
-                                mEventBorderPaint);
-
-                        drawEventTitle(mEventRects.get(i).event, mEventRects.get(i).rectF, canvas, top, left);
-                    } else
-                        mEventRects.get(i).rectF = null;
-                }
+            for (EventRect rect : mEventRects) {
+                mEventBackgroundPaint.setColor(rect.event.getColor() == 0 ? mDefaultEventColor : rect.event.getColor());
+                canvas.drawRect(rect.left + mCurrentOrigin.x, rect.top,
+                        rect.left + mCurrentOrigin.x + rect.width, rect.bottom,
+                        mEventBackgroundPaint);
             }
         }
+        canvas.restore();
     }
-
 
     /**
      * Draw the name of the event on top of the event rectangle.
@@ -1040,6 +791,7 @@ public class WeekHeaderView extends View {
         public float width;
         public float top;
         public float bottom;
+        public int row;
 
         /**
          * Create a new instance of event rect. An EventRect is actually the rectangle that is drawn
@@ -1085,6 +837,7 @@ public class WeekHeaderView extends View {
             mFetchedPeriod = -1;
         }
 
+        boolean clearedEvents = false;
         if (mWeekViewLoader != null) {
             int periodToFetch = (int) mWeekViewLoader.toWeekViewPeriodIndex(day);
             if (!isInEditMode() && (mFetchedPeriod < 0 || mFetchedPeriod != periodToFetch || mRefreshEvents)) {
@@ -1118,7 +871,7 @@ public class WeekHeaderView extends View {
                 sortAndCacheEvents(previousPeriodEvents);
                 sortAndCacheEvents(currentPeriodEvents);
                 sortAndCacheEvents(nextPeriodEvents);
-                calculateHeaderHeight();
+                clearedEvents = true;
 
                 mPreviousPeriodEvents = previousPeriodEvents;
                 mCurrentPeriodEvents = currentPeriodEvents;
@@ -1131,27 +884,22 @@ public class WeekHeaderView extends View {
         List<EventRect> tempEvents = mEventRects;
         mEventRects = new ArrayList<>();
 
-        // Iterate through each day with events to calculate the position of the events.
-        while (tempEvents.size() > 0) {
-            ArrayList<EventRect> eventRects = new ArrayList<>(tempEvents.size());
+        // TODO 临时测试超长全天日程
+        Calendar startTime0 = (Calendar) today().clone();
+        startTime0.set(Calendar.HOUR_OF_DAY, 0);
+        startTime0.set(Calendar.MINUTE, 0);
+        startTime0.set(Calendar.MONTH, 10 - 1);
+        startTime0.set(Calendar.YEAR, 2022);
+        startTime0.add(Calendar.DAY_OF_YEAR, -180);
+        Calendar endTime0 = (Calendar) startTime0.clone();
+        endTime0.add(Calendar.DAY_OF_YEAR, 360);
+        endTime0.add(Calendar.HOUR_OF_DAY, 23);
+        WeekViewEvent testEvent = new WeekViewEvent(8, "5", null, startTime0, endTime0, true);
+        testEvent.setColor(Color.parseColor("#FFC54E00"));
+        tempEvents.add(0, new EventRect(testEvent, testEvent, null));
 
-            // Get first event for a day.
-            EventRect eventRect1 = tempEvents.remove(0);
-            eventRects.add(eventRect1);
-
-            int i = 0;
-            while (i < tempEvents.size()) {
-                // Collect all other events for same day.
-                EventRect eventRect2 = tempEvents.get(i);
-                if (isSameDay(eventRect1.event.getStartTime(), eventRect2.event.getStartTime())) {
-                    tempEvents.remove(i);
-                    eventRects.add(eventRect2);
-                } else {
-                    i++;
-                }
-            }
-            computePositionOfEvents(eventRects);
-        }
+        computePositionOfEvents(tempEvents);
+        if (clearedEvents) calculateHeaderHeight();
     }
 
     /**
@@ -1162,10 +910,7 @@ public class WeekHeaderView extends View {
     private void cacheEvent(WeekViewEvent event) {
         if (event.getStartTime().compareTo(event.getEndTime()) >= 0)
             return;
-        List<WeekViewEvent> splitedEvents = event.splitWeekViewEvents();
-        for (WeekViewEvent splitedEvent : splitedEvents) {
-            mEventRects.add(new EventRect(splitedEvent, event, null));
-        }
+        mEventRects.add(new EventRect(event, event, null));
     }
 
     /**
@@ -1242,50 +987,48 @@ public class WeekHeaderView extends View {
      */
     private void expandEventsToMaxWidth(List<EventRect> collisionGroup) {
         // Expand the events to maximum possible width.
-        List<List<EventRect>> columns = new ArrayList<>();
-        columns.add(new ArrayList<>());
+        List<List<EventRect>> rows = new ArrayList<>();
+        rows.add(new ArrayList<>());
         for (EventRect eventRect : collisionGroup) {
             boolean isPlaced = false;
-            for (List<EventRect> column : columns) {
-                if (column.size() == 0) {
-                    column.add(eventRect);
+            for (List<EventRect> row : rows) {
+                if (row.size() == 0) {
+                    row.add(eventRect);
                     isPlaced = true;
-                } else if (!isEventsCollide(eventRect.event, column.get(column.size() - 1).event)) {
-                    column.add(eventRect);
+                } else if (!isEventsCollide(eventRect.event, row.get(row.size() - 1).event)) {
+                    row.add(eventRect);
                     isPlaced = true;
                     break;
                 }
             }
             if (!isPlaced) {
-                List<EventRect> newColumn = new ArrayList<>();
-                newColumn.add(eventRect);
-                columns.add(newColumn);
+                List<EventRect> newRow = new ArrayList<>();
+                newRow.add(eventRect);
+                rows.add(newRow);
             }
         }
 
 
         // Calculate left and right position for all the events.
-        // Get the maxRowCount by looking in all columns.
-        int maxRowCount = 0;
-        for (List<EventRect> column : columns) {
-            maxRowCount = Math.max(maxRowCount, column.size());
+        // Get the maxColumnCount by looking in all rows.
+        int maxColumnCount = 0;
+        for (List<EventRect> row : rows) {
+            maxColumnCount = Math.max(maxColumnCount, row.size());
         }
-        for (int i = 0; i < maxRowCount; i++) {
+        for (int i = 0; i < maxColumnCount; i++) {
             // Set the left and right values of the event.
-            float j = 0;
-            for (List<EventRect> column : columns) {
-                if (column.size() >= i + 1) {
-                    EventRect eventRect = column.get(i);
-                    eventRect.width = 1f / columns.size();
-                    eventRect.left = j / columns.size();
-                    if (!eventRect.event.isAllDay()) {
-                        eventRect.top = eventRect.event.getStartTime().get(Calendar.HOUR_OF_DAY) * 60 + eventRect.event.getStartTime().get(Calendar.MINUTE);
-                        eventRect.bottom = eventRect.event.getEndTime().get(Calendar.HOUR_OF_DAY) * 60 + eventRect.event.getEndTime().get(Calendar.MINUTE);
-                    } else {
-                        eventRect.top = 0;
-                        eventRect.bottom = mAllDayEventHeight;
+            int j = 0;
+            for (List<EventRect> row : rows) {
+                if (row.size() >= i + 1) {
+                    EventRect eventRect = row.get(i);
+                    eventRect.width = daysBetween(eventRect.event.getStartTime(), eventRect.event.getEndTime()) * (mWidthPerDay + mColumnGap);
+                    eventRect.left = mHeaderColumnWidth + daysBetween(today(), eventRect.event.getStartTime()) * (mWidthPerDay + mColumnGap);
+                    if (eventRect.event.isAllDay()) {
+                        eventRect.top = mNormalHeaderHeight + j * mAllDayEventHeight;
+                        eventRect.bottom = eventRect.top + mAllDayEventHeight;
+                        eventRect.row = j + 1;
+                        mEventRects.add(eventRect);
                     }
-                    mEventRects.add(eventRect);
                 }
                 j++;
             }
@@ -1490,11 +1233,6 @@ public class WeekHeaderView extends View {
         return mHourHeight;
     }
 
-    public void setHourHeight(int hourHeight) {
-        mNewHourHeight = hourHeight;
-        invalidate();
-    }
-
     public int getColumnGap() {
         return mColumnGap;
     }
@@ -1588,16 +1326,6 @@ public class WeekHeaderView extends View {
         invalidate();
     }
 
-    public int getHourSeparatorColor() {
-        return mHourSeparatorColor;
-    }
-
-    public void setHourSeparatorColor(int hourSeparatorColor) {
-        mHourSeparatorColor = hourSeparatorColor;
-        mHourSeparatorPaint.setColor(mHourSeparatorColor);
-        invalidate();
-    }
-
     public int getTodayBackgroundColor() {
         return mTodayBackgroundColor;
     }
@@ -1605,16 +1333,6 @@ public class WeekHeaderView extends View {
     public void setTodayBackgroundColor(int todayBackgroundColor) {
         mTodayBackgroundColor = todayBackgroundColor;
         mTodayBackgroundPaint.setColor(mTodayBackgroundColor);
-        invalidate();
-    }
-
-    public int getHourSeparatorHeight() {
-        return mHourSeparatorHeight;
-    }
-
-    public void setHourSeparatorHeight(int hourSeparatorHeight) {
-        mHourSeparatorHeight = hourSeparatorHeight;
-        mHourSeparatorPaint.setStrokeWidth(mHourSeparatorHeight);
         invalidate();
     }
 
@@ -1889,13 +1607,6 @@ public class WeekHeaderView extends View {
         invalidate();
     }
 
-    private float getNowLineY() {
-        float startY = mHeaderHeight + mTimeTextHeight / 2 + mHeaderMarginBottom + mCurrentOrigin.y;
-        Calendar now = Calendar.getInstance();
-        float beforeNow = (now.get(Calendar.HOUR_OF_DAY) + now.get(Calendar.MINUTE) / 60.0f) * mHourHeight;
-        return startY + beforeNow;
-    }
-
     /**
      * Get whether the week view should fling horizontally.
      *
@@ -1973,11 +1684,10 @@ public class WeekHeaderView extends View {
     @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        mScaleDetector.onTouchEvent(event);
         boolean val = mGestureDetector.onTouchEvent(event);
 
         // Check after call of mGestureDetector, so mCurrentFlingDirection and mCurrentScrollDirection are set.
-        if (event.getAction() == MotionEvent.ACTION_UP && !mIsZooming && mCurrentFlingDirection == Direction.NONE) {
+        if (event.getAction() == MotionEvent.ACTION_UP && mCurrentFlingDirection == Direction.NONE) {
             if (mCurrentScrollDirection == Direction.RIGHT || mCurrentScrollDirection == Direction.LEFT) {
                 goToNearestOrigin();
             }
@@ -2063,6 +1773,12 @@ public class WeekHeaderView extends View {
         goToDate(today);
     }
 
+    public void goFirstVisibleDay(Calendar outFirstVisibleDay) {
+        if (outFirstVisibleDay != mFirstVisibleDay) {
+            goToDate(outFirstVisibleDay);
+        }
+    }
+
     /**
      * Show a specific day on the week view.
      *
@@ -2140,59 +1856,12 @@ public class WeekHeaderView extends View {
     }
 
 
-    /////////////////////////////////////////////////////////////////
-    //
-    //      Interfaces.
-    //
-    /////////////////////////////////////////////////////////////////
-
-    public interface EventClickListener {
-        /**
-         * Triggered when clicked on one existing event
-         *
-         * @param event:     event clicked.
-         * @param eventRect: view containing the clicked event.
-         */
-        void onEventClick(WeekViewEvent event, RectF eventRect);
+    public void setCascadeScrollListener(CascadeScrollListener listener) {
+        this.mCascadeScrollListener = listener;
     }
 
-    public interface EventLongPressListener {
-        /**
-         * Similar to {@link WeekHeaderView.EventClickListener} but with a long press.
-         *
-         * @param event:     event clicked.
-         * @param eventRect: view containing the clicked event.
-         */
-        void onEventLongPress(WeekViewEvent event, RectF eventRect);
-    }
-
-    public interface EmptyViewClickListener {
-        /**
-         * Triggered when the users clicks on a empty space of the calendar.
-         *
-         * @param time: {@link Calendar} object set with the date and time of the clicked position on the view.
-         */
-        void onEmptyViewClicked(Calendar time);
-    }
-
-    public interface EmptyViewLongPressListener {
-        /**
-         * Similar to {@link WeekHeaderView.EmptyViewClickListener} but with long press.
-         *
-         * @param time: {@link Calendar} object set with the date and time of the long pressed position on the view.
-         */
-        void onEmptyViewLongPress(Calendar time);
-    }
-
-    public interface ScrollListener {
-        /**
-         * Called when the first visible day has changed.
-         * <p>
-         * (this will also be called during the first draw of the weekview)
-         *
-         * @param newFirstVisibleDay The new first visible day
-         * @param oldFirstVisibleDay The old first visible day (is null on the first call).
-         */
-        void onFirstVisibleDayChanged(Calendar newFirstVisibleDay, Calendar oldFirstVisibleDay);
+    public void setCurrentOriginX(float currentOriginX) {
+        mCurrentOrigin.x = currentOriginX;
+        invalidate();
     }
 }
