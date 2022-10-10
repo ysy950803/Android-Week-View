@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.alamkanak.weekview.CascadeScrollListener
 import com.alamkanak.weekview.DateTimeInterpreter
 import com.alamkanak.weekview.WeekHeaderView
 import com.alamkanak.weekview.WeekView
@@ -36,7 +37,7 @@ class CalendarActivity : AppCompatActivity() {
                 touchHeader = true
                 false
             }
-            setCascadeScrollListener(object : WeekHeaderView.CascadeScrollListener {
+            setCascadeScrollListener(object : CascadeScrollListener {
                 override fun onScrolling(currentOriginX: Float) {
                     if (touchHeader) weekView?.setCurrentOriginX(currentOriginX)
                 }
@@ -57,7 +58,7 @@ class CalendarActivity : AppCompatActivity() {
                 touchHeader = false
                 false
             }
-            setCascadeScrollListener(object : WeekView.CascadeScrollListener {
+            setCascadeScrollListener(object : CascadeScrollListener {
                 override fun onScrolling(currentOriginX: Float) {
                     if (!touchHeader) weekHeaderView?.setCurrentOriginX(currentOriginX)
                 }
@@ -122,8 +123,8 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.DAY_OF_YEAR, 1)
             add(Calendar.HOUR_OF_DAY, 23)
         }
-        events.add(WeekViewEvent(4, "1", null, startTime, endTime, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.event_color_01)
+        events.add(WeekViewEvent(4, "全天日程1", null, startTime, endTime, true).apply {
+            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
         })
 
         val startTime1 = (startTime.clone() as Calendar)
@@ -131,8 +132,8 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.DAY_OF_YEAR, 2)
             add(Calendar.HOUR_OF_DAY, 23)
         }
-        events.add(WeekViewEvent(5, "2", null, startTime1, endTime1, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.event_color_02)
+        events.add(WeekViewEvent(5, "全天日程2", null, startTime1, endTime1, true).apply {
+            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
         })
 
         val startTime2 = (startTime.clone() as Calendar).apply {
@@ -142,8 +143,8 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.DAY_OF_YEAR, 1)
             add(Calendar.HOUR_OF_DAY, 23)
         }
-        events.add(WeekViewEvent(6, "3", null, startTime2, endTime2, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.event_color_03)
+        events.add(WeekViewEvent(6, "全天日程3", null, startTime2, endTime2, true).apply {
+            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
         })
 
         val startTime3 = (startTime.clone() as Calendar).apply {
@@ -153,8 +154,8 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.DAY_OF_YEAR, 2)
             add(Calendar.HOUR_OF_DAY, 23)
         }
-        events.add(WeekViewEvent(7, "4", null, startTime3, endTime3, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.event_color_04)
+        events.add(WeekViewEvent(7, "全天日程4", null, startTime3, endTime3, true).apply {
+            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
         })
         return events
     }
@@ -163,7 +164,7 @@ class CalendarActivity : AppCompatActivity() {
         override fun interpretDate(date: Calendar): List<String> = try {
             val sdf = SimpleDateFormat("EEE", Locale.getDefault())
             listOf(
-                // TODO
+                // TODO 翻译
                 if (WeekViewUtil.isSameDay(date, Calendar.getInstance())) "今天"
                 else sdf.format(date.time).toUpperCase(Locale.getDefault()),
                 "${date.get(Calendar.DAY_OF_MONTH)}"

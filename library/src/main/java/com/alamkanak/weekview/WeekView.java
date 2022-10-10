@@ -1,5 +1,6 @@
 package com.alamkanak.weekview;
 
+import static com.alamkanak.weekview.WeekViewUtil.isFloatEqual;
 import static com.alamkanak.weekview.WeekViewUtil.isSameDay;
 import static com.alamkanak.weekview.WeekViewUtil.today;
 
@@ -21,7 +22,6 @@ import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.text.format.DateUtils;
-import android.text.style.StyleSpan;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.GestureDetector;
@@ -32,7 +32,6 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.OverScroller;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.GestureDetectorCompat;
@@ -128,7 +127,7 @@ public class WeekView extends View {
     private int mTodayHeaderTextColor = Color.rgb(39, 137, 228);
     private int mEventTextSize = 12;
     private int mEventTextColor = Color.BLACK;
-    private int mEventVPadding = 8;
+    private int mEventVPadding;
     private final int mEventHPadding;
     private int mHeaderColumnBackgroundColor = Color.WHITE;
     private boolean mIsFirstDraw = true;
@@ -339,7 +338,7 @@ public class WeekView extends View {
             mEventTextColor = a.getColor(R.styleable.WeekView_eventTextColor, mEventTextColor);
             mEventVPadding = a.getDimensionPixelSize(R.styleable.WeekView_eventPadding, mEventVPadding);
             // TODO 日程文本内容水平padding
-            mEventHPadding = mEventVPadding * 4;
+            mEventHPadding = ConvertUtils.dp2px(6);
             mHeaderColumnBackgroundColor = a.getColor(R.styleable.WeekView_headerColumnBackground, mHeaderColumnBackgroundColor);
             mDayNameLength = a.getInteger(R.styleable.WeekView_dayNameLength, mDayNameLength);
             mOverlappingEventGap = a.getDimensionPixelSize(R.styleable.WeekView_overlappingEventGap, mOverlappingEventGap);
@@ -443,7 +442,9 @@ public class WeekView extends View {
 
         // Prepare event text size and color.
         mEventTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG | Paint.LINEAR_TEXT_FLAG);
+        mEventTextPaint.setTextAlign(Paint.Align.LEFT);
         mEventTextPaint.setStyle(Paint.Style.FILL);
+        mEventTextPaint.setTypeface(Typeface.DEFAULT_BOLD);
         mEventTextPaint.setColor(mEventTextColor);
         mEventTextPaint.setTextSize(mEventTextSize);
 
@@ -499,7 +500,8 @@ public class WeekView extends View {
         mHeaderBottomBorderDrawable.draw(canvas);
 
         if (mCascadeScrollListener != null) {
-            if (mFirstVisibleDay != null && mScroller.isFinished() && Float.compare(mCurrentOrigin.x, mScroller.getFinalX()) == 0) {
+            if (mFirstVisibleDay != null && mScroller.isFinished()
+                    && isFloatEqual(mCurrentOrigin.x, mScroller.getFinalX())) {
                 mCascadeScrollListener.onScrollEnd(mFirstVisibleDay);
             } else {
                 mCascadeScrollListener.onScrolling(mCurrentOrigin.x);
@@ -751,7 +753,6 @@ public class WeekView extends View {
                         mEventRects.get(i).rectF = new RectF(left, top, right, bottom);
                         mEventBackgroundPaint.setColor(mEventRects.get(i).event.getColor() == 0 ? mDefaultEventColor : mEventRects.get(i).event.getColor());
                         canvas.drawRoundRect(mEventRects.get(i).rectF, mEventCornerRadius, mEventCornerRadius, mEventBackgroundPaint);
-
                         // TODO 日程左侧装饰边界线
                         canvas.drawRect(
                                 mEventRects.get(i).rectF.left,
@@ -759,8 +760,7 @@ public class WeekView extends View {
                                 mEventRects.get(i).rectF.left + ConvertUtils.dp2px(2),
                                 mEventRects.get(i).rectF.bottom,
                                 mEventBorderPaint);
-
-                        drawEventTitle(mEventRects.get(i).event, mEventRects.get(i).rectF, canvas, top, left);
+                        drawEventTitle(mEventRects.get(i).event, mEventRects.get(i).rectF, canvas);
                     } else
                         mEventRects.get(i).rectF = null;
                 }
@@ -776,13 +776,11 @@ public class WeekView extends View {
     /**
      * Draw the name of the event on top of the event rectangle.
      *
-     * @param event        The event of which the title (and location) should be drawn.
-     * @param rect         The rectangle on which the text is to be drawn.
-     * @param canvas       The canvas to draw upon.
-     * @param originalTop  The original top position of the rectangle. The rectangle may have some of its portion outside of the visible area.
-     * @param originalLeft The original left position of the rectangle. The rectangle may have some of its portion outside of the visible area.
+     * @param event  The event of which the title (and location) should be drawn.
+     * @param rect   The rectangle on which the text is to be drawn.
+     * @param canvas The canvas to draw upon.
      */
-    private void drawEventTitle(WeekViewEvent event, RectF rect, Canvas canvas, float originalTop, float originalLeft) {
+    private void drawEventTitle(WeekViewEvent event, RectF rect, Canvas canvas) {
         if (rect.right - rect.left - mEventHPadding * 2 < 0) return;
         if (rect.bottom - rect.top - mEventVPadding * 2 < 0) return;
 
@@ -790,7 +788,6 @@ public class WeekView extends View {
         SpannableStringBuilder bob = new SpannableStringBuilder();
         if (event.getName() != null) {
             bob.append(event.getName());
-            bob.setSpan(new StyleSpan(android.graphics.Typeface.BOLD), 0, bob.length(), 0);
             bob.append(' ');
         }
 
@@ -799,8 +796,8 @@ public class WeekView extends View {
             bob.append(event.getLocation());
         }
 
-        int availableHeight = (int) (rect.bottom - originalTop - mEventVPadding * 2);
-        int availableWidth = (int) (rect.right - originalLeft - mEventHPadding * 2);
+        int availableHeight = (int) (rect.bottom - rect.top - mEventVPadding * 2);
+        int availableWidth = (int) (rect.right - rect.left - mEventHPadding * 2);
 
         // Get text dimensions.
         StaticLayout textLayout = new StaticLayout(bob, mEventTextPaint, availableWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
@@ -812,7 +809,7 @@ public class WeekView extends View {
             int availableLineCount = availableHeight / lineHeight;
             do {
                 // Ellipsize text to fit into event rect.
-                textLayout = new StaticLayout(TextUtils.ellipsize(bob, mEventTextPaint, availableLineCount * availableWidth, TextUtils.TruncateAt.END), mEventTextPaint, (int) (rect.right - originalLeft - mEventHPadding * 2), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+                textLayout = new StaticLayout(TextUtils.ellipsize(bob, mEventTextPaint, availableLineCount * availableWidth, TextUtils.TruncateAt.END), mEventTextPaint, (int) (rect.right - rect.left - mEventHPadding * 2), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
 
                 // Reduce line count.
                 availableLineCount--;
@@ -822,46 +819,9 @@ public class WeekView extends View {
 
             // Draw text.
             canvas.save();
-            canvas.translate(originalLeft + mEventHPadding, originalTop + mEventVPadding);
+            canvas.translate(rect.left + mEventHPadding, rect.top + mEventVPadding);
             textLayout.draw(canvas);
             canvas.restore();
-        }
-    }
-
-
-    /**
-     * A class to hold reference to the events and their visual representation. An EventRect is
-     * actually the rectangle that is drawn on the calendar for a given event. There may be more
-     * than one rectangle for a single event (an event that expands more than one day). In that
-     * case two instances of the EventRect will be used for a single event. The given event will be
-     * stored in "originalEvent". But the event that corresponds to rectangle the rectangle
-     * instance will be stored in "event".
-     */
-    private static class EventRect {
-        public WeekViewEvent event;
-        public WeekViewEvent originalEvent;
-        public RectF rectF;
-        public float left;
-        public float width;
-        public float top;
-        public float bottom;
-
-        /**
-         * Create a new instance of event rect. An EventRect is actually the rectangle that is drawn
-         * on the calendar for a given event. There may be more than one rectangle for a single
-         * event (an event that expands more than one day). In that case two instances of the
-         * EventRect will be used for a single event. The given event will be stored in
-         * "originalEvent". But the event that corresponds to rectangle the rectangle instance will
-         * be stored in "event".
-         *
-         * @param event         Represents the event which this instance of rectangle represents.
-         * @param originalEvent The original event that was passed by the user.
-         * @param rectF         The rectangle.
-         */
-        public EventRect(WeekViewEvent event, WeekViewEvent originalEvent, RectF rectF) {
-            this.event = event;
-            this.rectF = rectF;
-            this.originalEvent = originalEvent;
         }
     }
 
@@ -1950,7 +1910,9 @@ public class WeekView extends View {
     }
 
     public void setCurrentOriginX(float currentOriginX) {
-        mCurrentOrigin.x = currentOriginX;
-        invalidate();
+        if (!isFloatEqual(currentOriginX, mCurrentOrigin.x)) {
+            mCurrentOrigin.x = currentOriginX;
+            invalidate();
+        }
     }
 }

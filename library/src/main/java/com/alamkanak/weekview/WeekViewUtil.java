@@ -44,10 +44,15 @@ public class WeekViewUtil {
     public static int daysBetween(Calendar dayOne, Calendar dayTwo) {
         return (int) Math.ceil((dayTwo.getTimeInMillis() - dayOne.getTimeInMillis()) * 1f / TimeUnit.DAYS.toMillis(1));
     }
-    
+
     public static boolean isContainsAllDay(Calendar day, WeekViewEvent event) {
         return day.getTimeInMillis() <= event.getEndTime().getTimeInMillis()
                 && event.getStartTime().getTimeInMillis() <= day.getTimeInMillis()
                 && event.isAllDay();
+    }
+
+    // TODO 忽略float误差，避免UI联动滑动细微晃动
+    public static boolean isFloatEqual(float a, float b) {
+        return Math.abs(a - b) < 1f;
     }
 }

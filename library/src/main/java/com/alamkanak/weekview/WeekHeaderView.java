@@ -2,6 +2,7 @@ package com.alamkanak.weekview;
 
 import static com.alamkanak.weekview.WeekViewUtil.daysBetween;
 import static com.alamkanak.weekview.WeekViewUtil.isContainsAllDay;
+import static com.alamkanak.weekview.WeekViewUtil.isFloatEqual;
 import static com.alamkanak.weekview.WeekViewUtil.isSameDay;
 import static com.alamkanak.weekview.WeekViewUtil.today;
 
@@ -15,14 +16,9 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.text.Layout;
-import android.text.SpannableStringBuilder;
-import android.text.StaticLayout;
 import android.text.TextPaint;
-import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.text.format.DateUtils;
-import android.text.style.StyleSpan;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.TypedValue;
@@ -34,9 +30,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.OverScroller;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 import androidx.core.view.GestureDetectorCompat;
 import androidx.core.view.ViewCompat;
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator;
@@ -118,7 +112,7 @@ public class WeekHeaderView extends View {
     private int mTodayHeaderTextColor = Color.rgb(39, 137, 228);
     private int mEventTextSize = 12;
     private int mEventTextColor = Color.BLACK;
-    private int mEventVPadding = 8;
+    private int mEventVPadding;
     private final int mEventHPadding;
     private int mHeaderColumnBackgroundColor = Color.WHITE;
     private boolean mIsFirstDraw = true;
@@ -137,6 +131,8 @@ public class WeekHeaderView extends View {
     private boolean mHorizontalFlingEnabled = true;
     private boolean mVerticalFlingEnabled = true;
     private int mAllDayEventHeight = 100;
+    // TODO 全天垂直滑动边界距离
+    private int mAllDayEventMinY;
     private int mScrollDuration = 250;
 
     // TODO 绘制过程中标记某天是否有日程
@@ -225,6 +221,9 @@ public class WeekHeaderView extends View {
                 case LEFT:
                 case RIGHT:
                     mScroller.fling((int) mCurrentOrigin.x, (int) mCurrentOrigin.y, (int) (velocityX * mXScrollingSpeed), 0, Integer.MIN_VALUE, Integer.MAX_VALUE, 0, 0);
+                    break;
+                case VERTICAL:
+                    mScroller.fling((int) mCurrentOrigin.x, (int) mCurrentOrigin.y, 0, (int) velocityY, Integer.MIN_VALUE, Integer.MAX_VALUE, mAllDayEventMinY, 0);
                     break;
             }
 
@@ -322,7 +321,7 @@ public class WeekHeaderView extends View {
             mEventTextColor = a.getColor(R.styleable.WeekView_eventTextColor, mEventTextColor);
             mEventVPadding = a.getDimensionPixelSize(R.styleable.WeekView_eventPadding, mEventVPadding);
             // TODO 日程文本内容水平padding
-            mEventHPadding = mEventVPadding * 4;
+            mEventHPadding = ConvertUtils.dp2px(6);
             mHeaderColumnBackgroundColor = a.getColor(R.styleable.WeekView_headerColumnBackground, mHeaderColumnBackgroundColor);
             mDayNameLength = a.getInteger(R.styleable.WeekView_dayNameLength, mDayNameLength);
             mOverlappingEventGap = a.getDimensionPixelSize(R.styleable.WeekView_overlappingEventGap, mOverlappingEventGap);
@@ -409,7 +408,9 @@ public class WeekHeaderView extends View {
 
         // Prepare event text size and color.
         mEventTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG | Paint.LINEAR_TEXT_FLAG);
+        mEventTextPaint.setTextAlign(Paint.Align.LEFT);
         mEventTextPaint.setStyle(Paint.Style.FILL);
+        mEventTextPaint.setTypeface(Typeface.DEFAULT_BOLD);
         mEventTextPaint.setColor(mEventTextColor);
         mEventTextPaint.setTextSize(mEventTextSize);
 
@@ -468,7 +469,8 @@ public class WeekHeaderView extends View {
         drawHeaderRowAndEvents(canvas);
 
         if (mCascadeScrollListener != null) {
-            if (mFirstVisibleDay != null && mScroller.isFinished() && Float.compare(mCurrentOrigin.x, mScroller.getFinalX()) == 0) {
+            if (mFirstVisibleDay != null && mScroller.isFinished()
+                    && isFloatEqual(mCurrentOrigin.x, mScroller.getFinalX())) {
                 mCascadeScrollListener.onScrollEnd(mFirstVisibleDay);
             } else {
                 mCascadeScrollListener.onScrolling(mCurrentOrigin.x);
@@ -492,7 +494,9 @@ public class WeekHeaderView extends View {
                 }
             }
         }
-        mHeaderHeight = mNormalHeaderHeight + mHeaderMarginBottom + mAllDayEventHeight * maxAllDayRowCount;
+        float visibleRowCount = Math.min(2.5f, maxAllDayRowCount * 1f);
+        mHeaderHeight = mNormalHeaderHeight + mHeaderMarginBottom + mAllDayEventHeight * visibleRowCount;
+        mAllDayEventMinY = (int) (mAllDayEventHeight * (visibleRowCount - maxAllDayRowCount));
         if (mHeaderHeight != getMeasuredHeight()) {
             requestLayout();
         }
@@ -532,8 +536,8 @@ public class WeekHeaderView extends View {
         }
 
         // If the new mCurrentOrigin.y is invalid, make it valid.
-        if (mCurrentOrigin.y < getHeight() - mHourHeight * 24 - mHeaderHeight - mHeaderMarginBottom - mTimeTextHeight / 2)
-            mCurrentOrigin.y = getHeight() - mHourHeight * 24 - mHeaderHeight - mHeaderMarginBottom - mTimeTextHeight / 2;
+        if (mCurrentOrigin.y < mAllDayEventMinY)
+            mCurrentOrigin.y = mAllDayEventMinY;
 
         // Don't put an "else if" because it will trigger a glitch when completely zoomed out and
         // scrolling vertically.
@@ -596,6 +600,8 @@ public class WeekHeaderView extends View {
         canvas.save();
         canvas.clipRect(0, 0, mTimeTextWidth + mHeaderColumnPadding * 2, mHeaderHeight);
         canvas.drawRect(0, 0, mTimeTextWidth + mHeaderColumnPadding * 2, mHeaderHeight, mHeaderBackgroundPaint);
+        // TODO 翻译
+        canvas.drawText("全天", mTimeTextWidth + mHeaderColumnPadding, mNormalHeaderHeight + ConvertUtils.dp2px(2) - mEventTextPaint.getFontMetrics().ascent, mTimeTextPaint);
         canvas.restore();
 
         // Clip to paint header row only.
@@ -707,13 +713,20 @@ public class WeekHeaderView extends View {
      */
     private void drawAllDayEvents(Canvas canvas) {
         canvas.save();
-        canvas.clipRect(mHeaderColumnWidth, 0, getWidth(), mHeaderHeight - mHeaderMarginBottom);
+        canvas.clipRect(mHeaderColumnWidth, mNormalHeaderHeight, getWidth(), mHeaderHeight - mHeaderMarginBottom);
         if (mEventRects != null && mEventRects.size() > 0) {
             for (EventRect rect : mEventRects) {
                 mEventBackgroundPaint.setColor(rect.event.getColor() == 0 ? mDefaultEventColor : rect.event.getColor());
-                canvas.drawRect(rect.left + mCurrentOrigin.x, rect.top,
-                        rect.left + mCurrentOrigin.x + rect.width, rect.bottom,
-                        mEventBackgroundPaint);
+                rect.rectF = new RectF(mCurrentOrigin.x + rect.left,
+                        mCurrentOrigin.y + rect.top + ConvertUtils.dp2px(2),
+                        mCurrentOrigin.x + rect.left + rect.width - mColumnGap,
+                        mCurrentOrigin.y + rect.bottom);
+                // TODO 日程背景
+                canvas.drawRect(rect.rectF.left, rect.rectF.top, rect.rectF.right, rect.rectF.bottom, mEventBackgroundPaint);
+                // TODO 日程左侧装饰边界线
+                canvas.drawRect(rect.rectF.left, rect.rectF.top, rect.rectF.left + ConvertUtils.dp2px(2), rect.rectF.bottom, mEventBorderPaint);
+                // TODO 日程标题
+                drawEventTitle(rect.event, rect.rectF, canvas);
             }
         }
         canvas.restore();
@@ -722,94 +735,22 @@ public class WeekHeaderView extends View {
     /**
      * Draw the name of the event on top of the event rectangle.
      *
-     * @param event        The event of which the title (and location) should be drawn.
-     * @param rect         The rectangle on which the text is to be drawn.
-     * @param canvas       The canvas to draw upon.
-     * @param originalTop  The original top position of the rectangle. The rectangle may have some of its portion outside of the visible area.
-     * @param originalLeft The original left position of the rectangle. The rectangle may have some of its portion outside of the visible area.
+     * @param event  The event of which the title (and location) should be drawn.
+     * @param rect   The rectangle on which the text is to be drawn.
+     * @param canvas The canvas to draw upon.
      */
-    private void drawEventTitle(WeekViewEvent event, RectF rect, Canvas canvas, float originalTop, float originalLeft) {
+    private void drawEventTitle(WeekViewEvent event, RectF rect, Canvas canvas) {
         if (rect.right - rect.left - mEventHPadding * 2 < 0) return;
         if (rect.bottom - rect.top - mEventVPadding * 2 < 0) return;
-
-        // Prepare the name of the event.
-        SpannableStringBuilder bob = new SpannableStringBuilder();
-        if (event.getName() != null) {
-            bob.append(event.getName());
-            bob.setSpan(new StyleSpan(Typeface.BOLD), 0, bob.length(), 0);
-            bob.append(' ');
-        }
-
-        // Prepare the location of the event.
-        if (event.getLocation() != null) {
-            bob.append(event.getLocation());
-        }
-
-        int availableHeight = (int) (rect.bottom - originalTop - mEventVPadding * 2);
-        int availableWidth = (int) (rect.right - originalLeft - mEventHPadding * 2);
-
-        // Get text dimensions.
-        StaticLayout textLayout = new StaticLayout(bob, mEventTextPaint, availableWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
-
-        int lineHeight = textLayout.getHeight() / textLayout.getLineCount();
-
-        if (availableHeight >= lineHeight) {
-            // Calculate available number of line counts.
-            int availableLineCount = availableHeight / lineHeight;
-            do {
-                // Ellipsize text to fit into event rect.
-                textLayout = new StaticLayout(TextUtils.ellipsize(bob, mEventTextPaint, availableLineCount * availableWidth, TextUtils.TruncateAt.END), mEventTextPaint, (int) (rect.right - originalLeft - mEventHPadding * 2), Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
-
-                // Reduce line count.
-                availableLineCount--;
-
-                // Repeat until text is short enough.
-            } while (textLayout.getHeight() > availableHeight);
-
-            // Draw text.
-            canvas.save();
-            canvas.translate(originalLeft + mEventHPadding, originalTop + mEventVPadding);
-            textLayout.draw(canvas);
-            canvas.restore();
-        }
-    }
-
-
-    /**
-     * A class to hold reference to the events and their visual representation. An EventRect is
-     * actually the rectangle that is drawn on the calendar for a given event. There may be more
-     * than one rectangle for a single event (an event that expands more than one day). In that
-     * case two instances of the EventRect will be used for a single event. The given event will be
-     * stored in "originalEvent". But the event that corresponds to rectangle the rectangle
-     * instance will be stored in "event".
-     */
-    private static class EventRect {
-        public WeekViewEvent event;
-        public WeekViewEvent originalEvent;
-        public RectF rectF;
-        public float left;
-        public float width;
-        public float top;
-        public float bottom;
-        public int row;
-
-        /**
-         * Create a new instance of event rect. An EventRect is actually the rectangle that is drawn
-         * on the calendar for a given event. There may be more than one rectangle for a single
-         * event (an event that expands more than one day). In that case two instances of the
-         * EventRect will be used for a single event. The given event will be stored in
-         * "originalEvent". But the event that corresponds to rectangle the rectangle instance will
-         * be stored in "event".
-         *
-         * @param event         Represents the event which this instance of rectangle represents.
-         * @param originalEvent The original event that was passed by the user.
-         * @param rectF         The rectangle.
-         */
-        public EventRect(WeekViewEvent event, WeekViewEvent originalEvent, RectF rectF) {
-            this.event = event;
-            this.rectF = rectF;
-            this.originalEvent = originalEvent;
-        }
+        rect.right -= mEventHPadding;
+        canvas.save();
+        canvas.clipRect(rect);
+        float left = Math.max(rect.left, mHeaderColumnWidth);
+        canvas.drawText(event.getName(),
+                left + mEventHPadding,
+                rect.top + mEventVPadding - mEventTextPaint.getFontMetrics().ascent,
+                mEventTextPaint);
+        canvas.restore();
     }
 
 
@@ -884,7 +825,7 @@ public class WeekHeaderView extends View {
         List<EventRect> tempEvents = mEventRects;
         mEventRects = new ArrayList<>();
 
-        // TODO 临时测试超长全天日程
+        // TODO 待删：临时测试超长全天日程
         Calendar startTime0 = (Calendar) today().clone();
         startTime0.set(Calendar.HOUR_OF_DAY, 0);
         startTime0.set(Calendar.MINUTE, 0);
@@ -894,8 +835,8 @@ public class WeekHeaderView extends View {
         Calendar endTime0 = (Calendar) startTime0.clone();
         endTime0.add(Calendar.DAY_OF_YEAR, 360);
         endTime0.add(Calendar.HOUR_OF_DAY, 23);
-        WeekViewEvent testEvent = new WeekViewEvent(8, "5", null, startTime0, endTime0, true);
-        testEvent.setColor(Color.parseColor("#FFC54E00"));
+        WeekViewEvent testEvent = new WeekViewEvent(8, "这个全天日程有一万年", null, startTime0, endTime0, true);
+        testEvent.setColor(Color.parseColor("#FFFFF4E9"));
         tempEvents.add(0, new EventRect(testEvent, testEvent, null));
 
         computePositionOfEvents(tempEvents);
@@ -1861,7 +1802,9 @@ public class WeekHeaderView extends View {
     }
 
     public void setCurrentOriginX(float currentOriginX) {
-        mCurrentOrigin.x = currentOriginX;
-        invalidate();
+        if (!isFloatEqual(currentOriginX, mCurrentOrigin.x)) {
+            mCurrentOrigin.x = currentOriginX;
+            invalidate();
+        }
     }
 }
