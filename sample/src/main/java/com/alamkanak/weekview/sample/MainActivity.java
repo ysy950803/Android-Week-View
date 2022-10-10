@@ -2,7 +2,6 @@ package com.alamkanak.weekview.sample;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -19,21 +18,18 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        findViewById(R.id.buttonBasic).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, BasicActivity.class);
-                startActivity(intent);
-            }
+        findViewById(R.id.buttonBasic).setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, BasicActivity.class);
+            startActivity(intent);
         });
 
-        findViewById(R.id.buttonAsynchronous).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, AsynchronousActivity.class);
-                startActivity(intent);
-            }
+        findViewById(R.id.buttonAsynchronous).setOnClickListener(v -> {
+            Intent intent = new Intent(MainActivity.this, AsynchronousActivity.class);
+            startActivity(intent);
+        });
+
+        findViewById(R.id.btn_calendar).setOnClickListener(v -> {
+            startActivity(new Intent(MainActivity.this, CalendarActivity.class));
         });
     }
-
 }

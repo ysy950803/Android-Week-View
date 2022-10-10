@@ -6,5 +6,9 @@
     <color name="event_color_04">#f8b552</color>
     <color name="toolbar">#efefef</color>
     <color name="toolbar_text">#8f000000</color>
-    <color name="accent">#2789e4</color>
+    <color name="accent">#ff7d41</color>
+
+    <color name="color_FF8628">#FF8628</color>
+    <color name="color_FFF4E9">#FFF4E9</color>
+    <color name="color_C54E00">#C54E00</color>
 </resources>
