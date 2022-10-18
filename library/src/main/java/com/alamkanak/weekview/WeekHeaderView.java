@@ -20,7 +20,6 @@ import android.text.TextPaint;
 import android.text.format.DateFormat;
 import android.text.format.DateUtils;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.HapticFeedbackConstants;
@@ -444,7 +443,7 @@ public class WeekHeaderView extends View {
         mTimeTextWidth = 0;
         for (int i = 0; i < 24; i++) {
             // Measure time string and get max width.
-            String time = getDateTimeInterpreter().interpretTime(i);
+            String time = getDateTimeInterpreter().interpretTime(i, 0);
             if (time == null)
                 throw new IllegalStateException("A DateTimeInterpreter must not return null time");
             mTimeTextWidth = Math.max(mTimeTextWidth, mTimeTextPaint.measureText(time));
@@ -546,7 +545,7 @@ public class WeekHeaderView extends View {
         }
 
         // Consider scroll offset.
-        int leftDaysWithGaps = (int) -(Math.ceil(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)));
+        int leftDaysWithGaps = (int) -(Math.round(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)));
         float startFromPixel = mCurrentOrigin.x + (mWidthPerDay + mColumnGap) * leftDaysWithGaps +
                 mHeaderColumnWidth;
         float startPixel = startFromPixel;
@@ -571,7 +570,7 @@ public class WeekHeaderView extends View {
         }
 
         for (int dayNumber = leftDaysWithGaps + 1;
-             dayNumber <= leftDaysWithGaps + mNumberOfVisibleDays + 1;
+             dayNumber <= leftDaysWithGaps + 1 + mNumberOfVisibleDays;
              dayNumber++) {
 
             // Check if the day is today.
@@ -614,7 +613,7 @@ public class WeekHeaderView extends View {
         // Draw the header row texts.
         startPixel = startFromPixel;
         for (int dayNumber = leftDaysWithGaps + 1;
-             dayNumber <= leftDaysWithGaps + mNumberOfVisibleDays + 1;
+             dayNumber <= leftDaysWithGaps + 1 + mNumberOfVisibleDays;
              dayNumber++) {
             // Check if the day is today.
             day = (Calendar) today.clone();
@@ -664,11 +663,11 @@ public class WeekHeaderView extends View {
      * @return The time and date at the clicked position.
      */
     private Calendar getTimeFromPoint(float x, float y) {
-        int leftDaysWithGaps = (int) -(Math.ceil(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)));
+        int leftDaysWithGaps = (int) -(Math.round(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)));
         float startPixel = mCurrentOrigin.x + (mWidthPerDay + mColumnGap) * leftDaysWithGaps +
                 mHeaderColumnWidth;
         for (int dayNumber = leftDaysWithGaps + 1;
-             dayNumber <= leftDaysWithGaps + mNumberOfVisibleDays + 1;
+             dayNumber <= leftDaysWithGaps + 1 + mNumberOfVisibleDays;
              dayNumber++) {
             float start = Math.max(startPixel, mHeaderColumnWidth);
             if (mWidthPerDay + startPixel - start > 0 && x > start && x < startPixel + mWidthPerDay) {
@@ -1118,11 +1117,10 @@ public class WeekHeaderView extends View {
                 }
 
                 @Override
-                public String interpretTime(int hour) {
+                public String interpretTime(int hour, int minute) {
                     Calendar calendar = Calendar.getInstance();
                     calendar.set(Calendar.HOUR_OF_DAY, hour);
-                    calendar.set(Calendar.MINUTE, 0);
-
+                    calendar.set(Calendar.MINUTE, minute);
                     try {
                         SimpleDateFormat sdf = DateFormat.is24HourFormat(getContext()) ? new SimpleDateFormat("HH:mm", Locale.getDefault()) : new SimpleDateFormat("hh a", Locale.getDefault());
                         return sdf.format(calendar.getTime());

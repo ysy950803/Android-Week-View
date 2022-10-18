@@ -9,5 +9,5 @@ import java.util.List;
 public interface DateTimeInterpreter {
     List<String> interpretDate(Calendar date);
 
-    String interpretTime(int hour);
+    String interpretTime(int hour, int minute);
 }

@@ -1,5 +1,8 @@
 package com.alamkanak.weekview;
 
+import android.view.HapticFeedbackConstants;
+import android.view.View;
+
 import java.util.Calendar;
 import java.util.concurrent.TimeUnit;
 
@@ -54,5 +57,10 @@ public class WeekViewUtil {
     // TODO 忽略float误差，避免UI联动滑动细微晃动
     public static boolean isFloatEqual(float a, float b) {
         return Math.abs(a - b) < 1f;
+    }
+
+    public static void performPressVibrate(View view) {
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS,
+                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
     }
 }
