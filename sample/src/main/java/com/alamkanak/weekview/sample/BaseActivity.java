@@ -41,10 +41,10 @@ public abstract class BaseActivity extends AppCompatActivity implements EventCli
         setContentView(R.layout.activity_base);
 
         // Get a reference for the week view in the layout.
-        mWeekView = (WeekView) findViewById(R.id.weekView);
+        mWeekView = findViewById(R.id.weekView);
 
         // Show a toast message about the touched event.
-        mWeekView.setOnEventClickListener(this);
+        mWeekView.setEventClickListener(this);
 
         // The week view has infinite scrolling horizontally. We have to provide the events of a
         // month every time the month changes on the week view.

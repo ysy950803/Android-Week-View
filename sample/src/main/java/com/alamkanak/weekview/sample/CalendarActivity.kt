@@ -14,6 +14,8 @@ import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
 import com.alamkanak.weekview.CascadeScrollListener
 import com.alamkanak.weekview.DateTimeInterpreter
+import com.alamkanak.weekview.MonthLoader
+import com.alamkanak.weekview.ScrollListener
 import com.alamkanak.weekview.WeekHeaderView
 import com.alamkanak.weekview.WeekView
 import com.alamkanak.weekview.WeekViewContainer
@@ -46,8 +48,13 @@ class CalendarActivity : AppCompatActivity() {
         downArrow?.setOnClickListener { weekView.goToBottomEventRect() }
 
         weekHeaderView?.apply {
-            setMonthChangeListener { newYear, newMonth ->
-                onMonthChangeListenerAllDay(newYear, newMonth)
+            monthChangeListener = object : MonthLoader.MonthChangeListener {
+                override fun onMonthChange(
+                    newYear: Int,
+                    newMonth: Int
+                ): MutableList<WeekViewEvent> {
+                    return onMonthChangeListenerAllDay(newYear, newMonth)
+                }
             }
             dateTimeInterpreter = createDateTimeInterpreter()
 
@@ -55,7 +62,7 @@ class CalendarActivity : AppCompatActivity() {
                 touchHeader = true
                 false
             }
-            setCascadeScrollListener(object : CascadeScrollListener {
+            cascadeScrollListener = object : CascadeScrollListener {
                 override fun onScrolling(currentOriginX: Float) {
                     if (touchHeader) weekView.setCurrentOriginX(currentOriginX)
                 }
@@ -63,13 +70,18 @@ class CalendarActivity : AppCompatActivity() {
                 override fun onScrollEnd(newFirstVisibleDay: Calendar) {
                     if (touchHeader) weekView.goFirstVisibleDay(newFirstVisibleDay)
                 }
-            })
-            setDayHasEvents(weekView.dayHasEvents)
+            }
+            dayHasEvents = weekView.dayHasEvents
         }
         weekView.apply {
-            setMonthChangeListener { newYear, newMonth ->
-                onMonthChangeListener(newYear, newMonth).also {
-                    post { updateArrowVisible() }
+            monthChangeListener = object : MonthLoader.MonthChangeListener {
+                override fun onMonthChange(
+                    newYear: Int,
+                    newMonth: Int
+                ): MutableList<WeekViewEvent> {
+                    return onMonthChangeListener(newYear, newMonth).also {
+                        post { updateArrowVisible() }
+                    }
                 }
             }
             dateTimeInterpreter = createDateTimeInterpreter()
@@ -78,7 +90,7 @@ class CalendarActivity : AppCompatActivity() {
                 touchHeader = false
                 false
             }
-            setCascadeScrollListener(object : CascadeScrollListener {
+            cascadeScrollListener = object : CascadeScrollListener {
                 override fun onScrolling(currentOriginX: Float) {
                     if (!touchHeader) weekHeaderView?.setCurrentOriginX(currentOriginX)
                 }
@@ -86,8 +98,15 @@ class CalendarActivity : AppCompatActivity() {
                 override fun onScrollEnd(newFirstVisibleDay: Calendar) {
                     if (!touchHeader) weekHeaderView?.goFirstVisibleDay(newFirstVisibleDay)
                 }
-            })
-            setScrollListener { newFirstVisibleDay, oldFirstVisibleDay -> updateArrowVisible() }
+            }
+            scrollListener = object : ScrollListener {
+                override fun onFirstVisibleDayChanged(
+                    newFirstVisibleDay: Calendar,
+                    oldFirstVisibleDay: Calendar?
+                ) {
+                    updateArrowVisible()
+                }
+            }
         }
 
         findViewById<WeekViewContainer>(
@@ -98,7 +117,7 @@ class CalendarActivity : AppCompatActivity() {
         startArrowAnim()
     }
 
-    private fun onMonthChangeListener(newYear: Int, newMonth: Int): List<WeekViewEvent> {
+    private fun onMonthChangeListener(newYear: Int, newMonth: Int): MutableList<WeekViewEvent> {
         val events: MutableList<WeekViewEvent> = ArrayList()
         val startTime = (today().clone() as Calendar).apply {
             this[Calendar.HOUR_OF_DAY] = 14
@@ -151,7 +170,10 @@ class CalendarActivity : AppCompatActivity() {
         return events
     }
 
-    private fun onMonthChangeListenerAllDay(newYear: Int, newMonth: Int): List<WeekViewEvent> {
+    private fun onMonthChangeListenerAllDay(
+        newYear: Int,
+        newMonth: Int
+    ): MutableList<WeekViewEvent> {
         val events: MutableList<WeekViewEvent> = ArrayList()
         val startTime = (today().clone() as Calendar).apply {
             this[Calendar.HOUR_OF_DAY] = 0
@@ -238,8 +260,8 @@ class CalendarActivity : AppCompatActivity() {
     }
 
     private fun updateArrowVisible() {
-        upArrow?.isVisible = !weekView.isTopEventRectVisible
-        downArrow?.isVisible = !weekView.isBottomEventRectVisible
+        upArrow?.isVisible = !weekView.isTopEventRectVisible()
+        downArrow?.isVisible = !weekView.isBottomEventRectVisible()
     }
 
     private fun startArrowAnim() {
