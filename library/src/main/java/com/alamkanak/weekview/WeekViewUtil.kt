@@ -1,5 +1,10 @@
 package com.alamkanak.weekview
 
+import android.os.Build
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.text.TextUtils
 import android.view.HapticFeedbackConstants
 import android.view.View
 import java.util.Calendar
@@ -56,6 +61,31 @@ object WeekViewUtil {
         view.performHapticFeedback(
             HapticFeedbackConstants.LONG_PRESS,
             HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+        )
+    }
+
+    @JvmStatic
+    fun obtainStaticLayout(
+        cs: CharSequence, textPaint: TextPaint, availableWidth: Int,
+        truncateAt: TextUtils.TruncateAt? = null, maxLines: Int = 0
+    ) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        StaticLayout.Builder.obtain(cs, 0, cs.length, textPaint, availableWidth).apply {
+            if (truncateAt != null) setEllipsize(truncateAt).setMaxLines(maxLines)
+        }.build()
+    } else {
+        StaticLayout(
+            if (truncateAt != null) TextUtils.ellipsize(
+                cs,
+                textPaint,
+                (availableWidth * maxLines).toFloat(),
+                truncateAt
+            ) else cs,
+            textPaint,
+            availableWidth,
+            Layout.Alignment.ALIGN_NORMAL,
+            1.0f,
+            0.0f,
+            false
         )
     }
 }

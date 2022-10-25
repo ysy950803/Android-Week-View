@@ -20,7 +20,6 @@ import android.view.SoundEffectConstants
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.OverScroller
-import androidx.core.content.ContextCompat
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator
@@ -64,13 +63,9 @@ class WeekHeaderView : View {
     private lateinit var mHeaderColumnBackgroundPaint: Paint
     private var mHeaderColumnWidth = 0f
     private var mEventRects = mutableListOf<EventRect>()
-    private var mPreviousPeriodEvents: MutableList<WeekViewEvent>? = null
-    private var mCurrentPeriodEvents: MutableList<WeekViewEvent>? = null
-    private var mNextPeriodEvents: MutableList<WeekViewEvent>? = null
     private lateinit var mEventTextPaint: TextPaint
     private var mFetchedPeriod = -1 // the middle period the calendar has fetched.
 
-    private var mRefreshEvents = false
     private var mCurrentFlingDirection = Direction.NONE
     private var mFirstVisibleDay: Calendar? = null
     private var mLastVisibleDay: Calendar? = null
@@ -162,9 +157,9 @@ class WeekHeaderView : View {
         override fun onFling(
             e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float
         ): Boolean {
-            if (mCurrentFlingDirection === Direction.LEFT && !horizontalFlingEnabled
-                || mCurrentFlingDirection === Direction.RIGHT && !horizontalFlingEnabled
-                || mCurrentFlingDirection === Direction.VERTICAL && !verticalFlingEnabled
+            if (mCurrentFlingDirection == Direction.LEFT && !horizontalFlingEnabled
+                || mCurrentFlingDirection == Direction.RIGHT && !horizontalFlingEnabled
+                || mCurrentFlingDirection == Direction.VERTICAL && !verticalFlingEnabled
             ) {
                 return true
             }
@@ -437,7 +432,7 @@ class WeekHeaderView : View {
         mHeaderHeight =
             mNormalHeaderHeight + mHeaderMarginBottom + allDayEventHeight * visibleRowCount
         mAllDayEventMinY = (allDayEventHeight * (visibleRowCount - maxAllDayRowCount)).toInt()
-        if (mHeaderHeight != measuredHeight.toFloat()) {
+        if (mHeaderHeight.toInt() != measuredHeight) {
             requestLayout()
         }
     }
@@ -500,14 +495,8 @@ class WeekHeaderView : View {
 
             // Get more events if necessary. We want to store the events 3 months beforehand. Get
             // events only when it is the first iteration of the loop.
-            weekViewLoader?.run {
-                if (mRefreshEvents || dayNumber == leftDaysWithGaps + 1
-                    && mFetchedPeriod != this.toWeekViewPeriodIndex(day).toInt()
-                    && abs(mFetchedPeriod - this.toWeekViewPeriodIndex(day)) > 0.5
-                ) {
-                    getMoreEvents(day)
-                    mRefreshEvents = false
-                }
+            if (dayNumber == leftDaysWithGaps + 1) {
+                getMoreEvents(day)
             }
 
             // Draw the events.
@@ -686,96 +675,27 @@ class WeekHeaderView : View {
      * @param day The day where the user is currently is.
      */
     private fun getMoreEvents(day: Calendar) {
-        // Get more events if the month is changed.
-        check(!(weekViewLoader == null && !isInEditMode)) { "You must provide a MonthChangeListener" }
-
-        // If a refresh was requested then reset some variables.
-        if (mRefreshEvents) {
-            mEventRects.clear()
-            mPreviousPeriodEvents = null
-            mCurrentPeriodEvents = null
-            mNextPeriodEvents = null
-            mFetchedPeriod = -1
-        }
-
         weekViewLoader?.run {
-            val periodToFetch = this.toWeekViewPeriodIndex(day).toInt()
-            if (!isInEditMode && (mFetchedPeriod < 0 || mFetchedPeriod != periodToFetch || mRefreshEvents)) {
-                var previousPeriodEvents: MutableList<WeekViewEvent>? = null
-                var currentPeriodEvents: MutableList<WeekViewEvent>? = null
-                var nextPeriodEvents: MutableList<WeekViewEvent>? = null
-                if (mPreviousPeriodEvents != null && mCurrentPeriodEvents != null && mNextPeriodEvents != null) {
-                    when (periodToFetch) {
-                        mFetchedPeriod - 1 -> {
-                            currentPeriodEvents = mPreviousPeriodEvents
-                            nextPeriodEvents = mCurrentPeriodEvents
-                        }
-                        mFetchedPeriod -> {
-                            previousPeriodEvents = mPreviousPeriodEvents
-                            currentPeriodEvents = mCurrentPeriodEvents
-                            nextPeriodEvents = mNextPeriodEvents
-                        }
-                        mFetchedPeriod + 1 -> {
-                            previousPeriodEvents = mCurrentPeriodEvents
-                            currentPeriodEvents = mNextPeriodEvents
-                        }
-                    }
-                }
-                if (currentPeriodEvents == null) currentPeriodEvents =
-                    this.onLoad(periodToFetch)
-                if (previousPeriodEvents == null) previousPeriodEvents =
-                    this.onLoad(periodToFetch - 1)
-                if (nextPeriodEvents == null) nextPeriodEvents =
-                    this.onLoad(periodToFetch + 1)
-
-                // Clear events.
-                mEventRects.clear()
-                sortAndCacheEvents(previousPeriodEvents)
-                sortAndCacheEvents(currentPeriodEvents)
-                sortAndCacheEvents(nextPeriodEvents)
-
-                mPreviousPeriodEvents = previousPeriodEvents
-                mCurrentPeriodEvents = currentPeriodEvents
-                mNextPeriodEvents = nextPeriodEvents
+            val periodToFetch = this.toWeekViewPeriodIndex(day)
+            if (!isInEditMode && (mFetchedPeriod < 0 || mFetchedPeriod != periodToFetch)) {
+                this.onLoad(periodToFetch)
                 mFetchedPeriod = periodToFetch
             }
         }
+    }
 
+    /**
+     * Refreshes the view and loads the events again.
+     */
+    fun notifyDatasetChanged(data: MutableList<WeekViewEvent>) {
+        // Clear events.
+        mEventRects.clear()
+        sortAndCacheEvents(data)
         // Prepare to calculate positions of each events.
         val tempEvents = mEventRects
         mEventRects = mutableListOf()
-
-        // TODO 待删：临时测试超长全天日程
-        val startTime0 = (today().clone() as Calendar).apply {
-            this[Calendar.HOUR_OF_DAY] = 0
-            this[Calendar.MINUTE] = 0
-            this[Calendar.MONTH] = 10 - 1
-            this[Calendar.YEAR] = 2022
-            this.add(Calendar.DAY_OF_YEAR, -180)
-        }
-        val endTime0 = (startTime0.clone() as Calendar).apply {
-            this.add(Calendar.DAY_OF_YEAR, 360)
-            this.add(Calendar.HOUR_OF_DAY, 23)
-        }
-        val testEvent = WeekViewEvent(8, "这个全天日程有一万年", null, startTime0, endTime0, true).apply {
-            borderColors = intArrayOf(
-                ContextCompat.getColor(context, R.color.color_ff8628),
-                ContextCompat.getColor(context, R.color.color_b4b4b4)
-            )
-            bgColors = intArrayOf(
-                ContextCompat.getColor(context, R.color.color_fff4e9),
-                ContextCompat.getColor(context, R.color.color_f7f8f8)
-            )
-            textColors = intArrayOf(
-                ContextCompat.getColor(context, R.color.color_c54e00),
-                ContextCompat.getColor(context, R.color.color_959595)
-            )
-            baseBgColor = ContextCompat.getColor(context, R.color.color_b3ffffff)
-        }
-        tempEvents.add(0, EventRect(testEvent, testEvent, null))
-
         computePositionOfEvents(tempEvents)
-        if (mEventRects.isEmpty()) calculateHeaderHeight()
+        if (mEventRects.isNotEmpty()) invalidate() else calculateHeaderHeight()
     }
 
     /**
@@ -794,19 +714,20 @@ class WeekHeaderView : View {
      * @param events The events to be sorted and cached.
      */
     private fun sortAndCacheEvents(events: MutableList<WeekViewEvent>?) {
-        events ?: return
-        events.sortWith { event1, event2 ->
-            val start1 = event1.startTime.timeInMillis
-            val start2 = event2.startTime.timeInMillis
-            var comparator = start1.compareTo(start2)
-            if (comparator == 0) {
-                val end1 = event1.endTime.timeInMillis
-                val end2 = event2.endTime.timeInMillis
-                comparator = end1.compareTo(end2)
+        events.takeIf { !it.isNullOrEmpty() }?.run {
+            sortWith { event1, event2 ->
+                val start1 = event1.startTime.timeInMillis
+                val start2 = event2.startTime.timeInMillis
+                var comparator = start1.compareTo(start2)
+                if (comparator == 0) {
+                    val end1 = event1.endTime.timeInMillis
+                    val end2 = event2.endTime.timeInMillis
+                    comparator = end1.compareTo(end2)
+                }
+                comparator
             }
-            comparator
+            forEach { cacheEvent(it) }
         }
-        events.forEach { cacheEvent(it) }
     }
 
     /**
@@ -1192,8 +1113,8 @@ class WeekHeaderView : View {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val ret = mGestureDetector.onTouchEvent(event)
         // Check after call of mGestureDetector, so mCurrentFlingDirection and mCurrentScrollDirection are set.
-        if (event.action == MotionEvent.ACTION_UP && mCurrentFlingDirection === Direction.NONE) {
-            if (mCurrentScrollDirection === Direction.RIGHT || mCurrentScrollDirection === Direction.LEFT) {
+        if (event.action == MotionEvent.ACTION_UP && mCurrentFlingDirection == Direction.NONE) {
+            if (mCurrentScrollDirection == Direction.RIGHT || mCurrentScrollDirection == Direction.LEFT) {
                 goToNearestOrigin()
             }
             mCurrentScrollDirection = Direction.NONE
@@ -1203,13 +1124,13 @@ class WeekHeaderView : View {
 
     private fun goToNearestOrigin() {
         var leftDays = mCurrentOrigin.x / (mWidthPerDay + mColumnGap)
-        leftDays = if (mCurrentFlingDirection !== Direction.NONE) {
+        leftDays = if (mCurrentFlingDirection != Direction.NONE) {
             // snap to nearest day
             round(leftDays)
-        } else if (mCurrentScrollDirection === Direction.LEFT) {
+        } else if (mCurrentScrollDirection == Direction.LEFT) {
             // snap to last day
             floor(leftDays)
-        } else if (mCurrentScrollDirection === Direction.RIGHT) {
+        } else if (mCurrentScrollDirection == Direction.RIGHT) {
             // snap to next day
             ceil(leftDays)
         } else {
@@ -1241,12 +1162,12 @@ class WeekHeaderView : View {
     override fun computeScroll() {
         super.computeScroll()
         if (mScroller.isFinished) {
-            if (mCurrentFlingDirection !== Direction.NONE) {
+            if (mCurrentFlingDirection != Direction.NONE) {
                 // Snap to day after fling is finished.
                 goToNearestOrigin()
             }
         } else {
-            if (mCurrentFlingDirection !== Direction.NONE && forceFinishScroll()) {
+            if (mCurrentFlingDirection != Direction.NONE && forceFinishScroll()) {
                 goToNearestOrigin()
             } else if (mScroller.computeScrollOffset()) {
                 mCurrentOrigin.y = mScroller.currY.toFloat()
@@ -1281,9 +1202,7 @@ class WeekHeaderView : View {
     }
 
     fun goFirstVisibleDay(outFirstVisibleDay: Calendar) {
-        if (outFirstVisibleDay !== mFirstVisibleDay) {
-            goToDate(outFirstVisibleDay, false)
-        }
+        goToDate(outFirstVisibleDay, false)
     }
 
     /**
@@ -1305,7 +1224,6 @@ class WeekHeaderView : View {
             mScrollToDay = date
             return
         }
-        mRefreshEvents = true
         val today = Calendar.getInstance().apply {
             this[Calendar.HOUR_OF_DAY] = 0
             this[Calendar.MINUTE] = 0
@@ -1333,14 +1251,6 @@ class WeekHeaderView : View {
         }
     }
 
-    /**
-     * Refreshes the view and loads the events again.
-     */
-    fun notifyDatasetChanged() {
-        mRefreshEvents = true
-        invalidate()
-    }
-
     /////////////////////////////////////////////////////////////////
     //
     //      Custom
@@ -1358,10 +1268,8 @@ class WeekHeaderView : View {
 
     private fun checkCascadeScrollListener() {
         cascadeScrollListener?.let { listener ->
-            if (mScroller.isFinished && isFloatEqual(
-                    mCurrentOrigin.x,
-                    mScroller.finalX.toFloat()
-                )
+            if (mScroller.isFinished
+                && isFloatEqual(mCurrentOrigin.x, mScroller.finalX.toFloat())
             ) {
                 mFirstVisibleDay?.let { listener.onScrollEnd(it) }
             } else {

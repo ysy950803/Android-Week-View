@@ -9,13 +9,14 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.text.Layout
 import android.text.SpannableStringBuilder
-import android.text.StaticLayout
+import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextUtils
 import android.text.format.DateFormat
 import android.text.format.DateUtils
+import android.text.style.AbsoluteSizeSpan
+import android.text.style.StyleSpan
 import android.util.AttributeSet
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.HapticFeedbackConstants
@@ -29,6 +30,7 @@ import androidx.core.view.ViewCompat
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator
 import com.alamkanak.weekview.WeekViewUtil.isFloatEqual
 import com.alamkanak.weekview.WeekViewUtil.isSameDay
+import com.alamkanak.weekview.WeekViewUtil.obtainStaticLayout
 import com.alamkanak.weekview.WeekViewUtil.performPressVibrate
 import com.alamkanak.weekview.WeekViewUtil.today
 import com.blankj.utilcode.util.ConvertUtils
@@ -67,13 +69,9 @@ class WeekView : View {
     private lateinit var mEventBorderPaint: Paint
     private var mHeaderColumnWidth = 0f
     private var mEventRects = mutableListOf<EventRect>()
-    private var mPreviousPeriodEvents: MutableList<WeekViewEvent>? = null
-    private var mCurrentPeriodEvents: MutableList<WeekViewEvent>? = null
-    private var mNextPeriodEvents: MutableList<WeekViewEvent>? = null
     private lateinit var mEventTextPaint: TextPaint
     private var mFetchedPeriod = -1 // the middle period the calendar has fetched.
 
-    private var mRefreshEvents = false
     private var mCurrentFlingDirection = Direction.NONE
     private var mFirstVisibleDay: Calendar? = null
     private var mLastVisibleDay: Calendar? = null
@@ -228,8 +226,8 @@ class WeekView : View {
             velocityX: Float,
             velocityY: Float
         ): Boolean {
-            if (mCurrentFlingDirection === Direction.LEFT && !horizontalFlingEnabled ||
-                mCurrentFlingDirection === Direction.RIGHT && !horizontalFlingEnabled
+            if (mCurrentFlingDirection == Direction.LEFT && !horizontalFlingEnabled ||
+                mCurrentFlingDirection == Direction.RIGHT && !horizontalFlingEnabled
             ) {
                 return true
             }
@@ -576,7 +574,6 @@ class WeekView : View {
         mEventTextPaint = TextPaint(Paint.ANTI_ALIAS_FLAG or Paint.LINEAR_TEXT_FLAG).apply {
             textAlign = Paint.Align.LEFT
             style = Paint.Style.FILL
-            typeface = Typeface.DEFAULT_BOLD
             color = mEventTextColor
             textSize = this@WeekView.mEventTextSize.toFloat()
         }
@@ -708,14 +705,8 @@ class WeekView : View {
 
             // Get more events if necessary. We want to store the events 3 months beforehand. Get
             // events only when it is the first iteration of the loop.
-            weekViewLoader?.run {
-                if (mRefreshEvents || dayNumber == leftDaysWithGaps + 1
-                    && mFetchedPeriod != this.toWeekViewPeriodIndex(day).toInt()
-                    && abs(mFetchedPeriod - this.toWeekViewPeriodIndex(day)) > 0.5
-                ) {
-                    getMoreEvents(day)
-                    mRefreshEvents = false
-                }
+            if (dayNumber == leftDaysWithGaps + 1) {
+                getMoreEvents(day)
             }
 
             // Draw background color for each day.
@@ -902,62 +893,79 @@ class WeekView : View {
         if (rect.right - rect.left - mEventHPadding * 2 < 0) return
         if (rect.bottom - rect.top - mEventVPadding * 2 < 0) return
 
-        // Prepare the name of the event.
-        val bob = SpannableStringBuilder()
-        if (event.name.isNotEmpty()) {
-            bob.append(event.name)
-            bob.append(' ')
-        }
-
-        // Prepare the location of the event.
-        bob.append(event.location)
-
         val availableHeight = (rect.bottom - rect.top - mEventVPadding * 2).toInt()
         val availableWidth = (rect.right - rect.left - mEventHPadding * 2).toInt()
-
+        val onlyTitle = rect.height() < mHourHeight
         mEventTextPaint.withTextColor(event)
+
+        // Prepare the name of the event.
+        val title = SpannableStringBuilder(event.name.replace("\\s+", " ")).apply {
+            setSpan(
+                AbsoluteSizeSpan(ConvertUtils.sp2px(14f)),
+                0,
+                length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            setSpan(StyleSpan(Typeface.BOLD), 0, length, 0)
+        }
+        // Prepare the location of the event.
+        val location = SpannableStringBuilder(event.location.replace("[\n\r]", " ")).apply {
+            setSpan(
+                AbsoluteSizeSpan(ConvertUtils.sp2px(12f)),
+                0,
+                length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        val allText = SpannableStringBuilder(title).apply {
+            if (!onlyTitle) append("\n").append(location)
+        }
+
         // Get text dimensions.
-        var textLayout = StaticLayout(
-            bob,
-            mEventTextPaint,
-            availableWidth,
-            Layout.Alignment.ALIGN_NORMAL,
-            1.0f,
-            0.0f,
-            false
-        )
-        val lineHeight = textLayout.height / textLayout.lineCount
+        val allTextLayout = obtainStaticLayout(allText, mEventTextPaint, availableWidth)
+        val lineHeight = allTextLayout.height / allTextLayout.lineCount
+
         if (availableHeight >= lineHeight) {
             // Calculate available number of line counts.
             var availableLineCount = availableHeight / lineHeight
-            do {
-                // Ellipsize text to fit into event rect.
-                textLayout = StaticLayout(
-                    TextUtils.ellipsize(
-                        bob,
-                        mEventTextPaint,
-                        (availableLineCount * availableWidth).toFloat(),
-                        TextUtils.TruncateAt.END
-                    ),
-                    mEventTextPaint,
-                    (rect.right - rect.left - mEventHPadding * 2).toInt(),
-                    Layout.Alignment.ALIGN_NORMAL,
-                    1.0f,
-                    0.0f,
-                    false
-                )
 
-                // Reduce line count.
-                availableLineCount--
+            var titleLayout = obtainStaticLayout(
+                title, mEventTextPaint, availableWidth, TextUtils.TruncateAt.END,
+                if (onlyTitle) 1 else availableLineCount - if (location.isNotEmpty()) 1 else 0
+            )
+            // 空余给地址的line
+            availableLineCount -= titleLayout.lineCount
 
-                // Repeat until text is short enough.
-            } while (textLayout.height > availableHeight)
-
+            val ellipsisCount = titleLayout.getEllipsisCount(titleLayout.lineCount - 1)
+            if (ellipsisCount > 0) {
+                val subTitle = title.subSequence(0, title.length - ellipsisCount)
+                titleLayout = obtainStaticLayout(subTitle, mEventTextPaint, availableWidth)
+            }
             // Draw text.
             canvas.save()
             canvas.translate(rect.left + mEventHPadding, rect.top + mEventVPadding)
-            textLayout.draw(canvas)
+            titleLayout.draw(canvas)
             canvas.restore()
+
+            if (location.isNotEmpty() && availableLineCount > 0) {
+                var locationLayout = obtainStaticLayout(
+                    location, mEventTextPaint, availableWidth,
+                    TextUtils.TruncateAt.END, availableLineCount
+                )
+                val locEllipsisCount = locationLayout.getEllipsisCount(locationLayout.lineCount - 1)
+                if (locEllipsisCount > 0) {
+                    val subLocation = location.subSequence(0, location.length - locEllipsisCount)
+                    locationLayout =
+                        obtainStaticLayout(subLocation, mEventTextPaint, availableWidth)
+                }
+                canvas.save()
+                canvas.translate(
+                    rect.left + mEventHPadding,
+                    rect.top + mEventVPadding + titleLayout.height
+                )
+                locationLayout.draw(canvas)
+                canvas.restore()
+            }
         }
     }
 
@@ -1120,64 +1128,25 @@ class WeekView : View {
      * @param day The day where the user is currently is.
      */
     private fun getMoreEvents(day: Calendar) {
-        // Get more events if the month is changed.
-        check(!(weekViewLoader == null && !isInEditMode)) { "You must provide a MonthChangeListener" }
-
-        // If a refresh was requested then reset some variables.
-        if (mRefreshEvents) {
-            mEventRects.clear()
-            mPreviousPeriodEvents = null
-            mCurrentPeriodEvents = null
-            mNextPeriodEvents = null
-            mFetchedPeriod = -1
-        }
-
         weekViewLoader?.run {
-            val periodToFetch = this.toWeekViewPeriodIndex(day).toInt()
-            if (!isInEditMode && (mFetchedPeriod < 0 || mFetchedPeriod != periodToFetch || mRefreshEvents)) {
-                var previousPeriodEvents: MutableList<WeekViewEvent>? = null
-                var currentPeriodEvents: MutableList<WeekViewEvent>? = null
-                var nextPeriodEvents: MutableList<WeekViewEvent>? = null
-                if (mPreviousPeriodEvents != null && mCurrentPeriodEvents != null && mNextPeriodEvents != null) {
-                    when (periodToFetch) {
-                        mFetchedPeriod - 1 -> {
-                            currentPeriodEvents = mPreviousPeriodEvents
-                            nextPeriodEvents = mCurrentPeriodEvents
-                        }
-                        mFetchedPeriod -> {
-                            previousPeriodEvents = mPreviousPeriodEvents
-                            currentPeriodEvents = mCurrentPeriodEvents
-                            nextPeriodEvents = mNextPeriodEvents
-                        }
-                        mFetchedPeriod + 1 -> {
-                            previousPeriodEvents = mCurrentPeriodEvents
-                            currentPeriodEvents = mNextPeriodEvents
-                        }
-                    }
-                }
-                if (currentPeriodEvents == null) currentPeriodEvents =
-                    this.onLoad(periodToFetch)
-                if (previousPeriodEvents == null) previousPeriodEvents =
-                    this.onLoad(periodToFetch - 1)
-                if (nextPeriodEvents == null) nextPeriodEvents =
-                    this.onLoad(periodToFetch + 1)
-
-                // Clear events.
-                mEventRects.clear()
-                sortAndCacheEvents(previousPeriodEvents)
-                sortAndCacheEvents(currentPeriodEvents)
-                sortAndCacheEvents(nextPeriodEvents)
-                mPreviousPeriodEvents = previousPeriodEvents
-                mCurrentPeriodEvents = currentPeriodEvents
-                mNextPeriodEvents = nextPeriodEvents
+            val periodToFetch = this.toWeekViewPeriodIndex(day)
+            if (!isInEditMode && (mFetchedPeriod < 0 || mFetchedPeriod != periodToFetch)) {
+                this.onLoad(periodToFetch)
                 mFetchedPeriod = periodToFetch
             }
         }
+    }
 
+    /**
+     * Refreshes the view and loads the events again.
+     */
+    fun notifyDatasetChanged(data: MutableList<WeekViewEvent>) {
+        // Clear events.
+        mEventRects.clear()
+        sortAndCacheEvents(data)
         // Prepare to calculate positions of each events.
         val tempEvents = mEventRects
         mEventRects = mutableListOf()
-
         // Iterate through each day with events to calculate the position of the events.
         while (tempEvents.size > 0) {
             val eventRects = ArrayList<EventRect>(tempEvents.size)
@@ -1197,6 +1166,7 @@ class WeekView : View {
             }
             computePositionOfEvents(eventRects)
         }
+        invalidate()
     }
 
     /**
@@ -1217,19 +1187,20 @@ class WeekView : View {
      * @param events The events to be sorted and cached.
      */
     private fun sortAndCacheEvents(events: MutableList<WeekViewEvent>?) {
-        events ?: return
-        events.sortWith { event1, event2 ->
-            val start1 = event1.startTime.timeInMillis
-            val start2 = event2.startTime.timeInMillis
-            var comparator = start1.compareTo(start2)
-            if (comparator == 0) {
-                val end1 = event1.endTime.timeInMillis
-                val end2 = event2.endTime.timeInMillis
-                comparator = end1.compareTo(end2)
+        events.takeIf { !it.isNullOrEmpty() }?.run {
+            sortWith { event1, event2 ->
+                val start1 = event1.startTime.timeInMillis
+                val start2 = event2.startTime.timeInMillis
+                var comparator = start1.compareTo(start2)
+                if (comparator == 0) {
+                    val end1 = event1.endTime.timeInMillis
+                    val end2 = event2.endTime.timeInMillis
+                    comparator = end1.compareTo(end2)
+                }
+                comparator
             }
-            comparator
+            forEach { cacheEvent(it) }
         }
-        events.forEach { cacheEvent(it) }
     }
 
     /**
@@ -1676,8 +1647,8 @@ class WeekView : View {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val ret = mGestureDetector.onTouchEvent(event)
         // Check after call of mGestureDetector, so mCurrentFlingDirection and mCurrentScrollDirection are set.
-        if (event.action == MotionEvent.ACTION_UP && mCurrentFlingDirection === Direction.NONE) {
-            if (mCurrentScrollDirection === Direction.RIGHT || mCurrentScrollDirection === Direction.LEFT) {
+        if (event.action == MotionEvent.ACTION_UP && mCurrentFlingDirection == Direction.NONE) {
+            if (mCurrentScrollDirection == Direction.RIGHT || mCurrentScrollDirection == Direction.LEFT) {
                 goToNearestOrigin()
             }
             mCurrentScrollDirection = Direction.NONE
@@ -1700,13 +1671,13 @@ class WeekView : View {
 
     private fun goToNearestOrigin() {
         var leftDays = mCurrentOrigin.x / (mWidthPerDay + mColumnGap)
-        leftDays = if (mCurrentFlingDirection !== Direction.NONE) {
+        leftDays = if (mCurrentFlingDirection != Direction.NONE) {
             // snap to nearest day
             round(leftDays)
-        } else if (mCurrentScrollDirection === Direction.LEFT) {
+        } else if (mCurrentScrollDirection == Direction.LEFT) {
             // snap to last day
             floor(leftDays)
-        } else if (mCurrentScrollDirection === Direction.RIGHT) {
+        } else if (mCurrentScrollDirection == Direction.RIGHT) {
             // snap to next day
             ceil(leftDays)
         } else {
@@ -1736,12 +1707,12 @@ class WeekView : View {
     override fun computeScroll() {
         super.computeScroll()
         if (mScroller.isFinished) {
-            if (mCurrentFlingDirection !== Direction.NONE) {
+            if (mCurrentFlingDirection != Direction.NONE) {
                 // Snap to day after fling is finished.
                 goToNearestOrigin()
             }
         } else {
-            if (mCurrentFlingDirection !== Direction.NONE && forceFinishScroll()) {
+            if (mCurrentFlingDirection != Direction.NONE && forceFinishScroll()) {
                 goToNearestOrigin()
             } else if (mScroller.computeScrollOffset()) {
                 mCurrentOrigin.x = mScroller.currX.toFloat()
@@ -1775,9 +1746,7 @@ class WeekView : View {
     }
 
     fun goFirstVisibleDay(outFirstVisibleDay: Calendar) {
-        if (outFirstVisibleDay !== mFirstVisibleDay) {
-            goToDate(outFirstVisibleDay, false)
-        }
+        goToDate(outFirstVisibleDay, false)
     }
 
     /**
@@ -1799,7 +1768,6 @@ class WeekView : View {
             mScrollToDay = date
             return
         }
-        mRefreshEvents = true
         val today = Calendar.getInstance().apply {
             this[Calendar.HOUR_OF_DAY] = 0
             this[Calendar.MINUTE] = 0
@@ -1825,14 +1793,6 @@ class WeekView : View {
             mCurrentOrigin.x = newX
             invalidate()
         }
-    }
-
-    /**
-     * Refreshes the view and loads the events again.
-     */
-    fun notifyDatasetChanged() {
-        mRefreshEvents = true
-        invalidate()
     }
 
     /**

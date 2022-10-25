@@ -4,12 +4,17 @@ import java.util.Calendar
 
 class MonthLoader(var onMonthChangeListener: MonthChangeListener) : WeekViewLoader {
 
-    override fun toWeekViewPeriodIndex(instance: Calendar): Double {
-        return instance[Calendar.YEAR] * 12 + instance[Calendar.MONTH] + (instance[Calendar.DAY_OF_MONTH] - 1) / 30.0
+    override fun toWeekViewPeriodIndex(instance: Calendar): Int {
+        return instance[Calendar.YEAR] * 12 + instance[Calendar.MONTH] + 1
     }
 
-    override fun onLoad(periodIndex: Int): MutableList<WeekViewEvent> {
-        return onMonthChangeListener.onMonthChange(periodIndex / 12, periodIndex % 12 + 1)
+    override fun onLoad(periodIndex: Int) {
+        onMonthChangeListener.onMonthChange(
+            periodIndex,
+            (periodIndex - 1) / 12, (periodIndex - 1) % 12,
+            periodIndex / 12, periodIndex % 12,
+            (periodIndex + 1) / 12, (periodIndex + 1) % 12,
+        )
     }
 
     interface MonthChangeListener {
@@ -20,8 +25,12 @@ class MonthLoader(var onMonthChangeListener: MonthChangeListener) : WeekViewLoad
          *
          * @param newYear  : year of the events required by the view.
          * @param newMonth : month of the events required by the view <br></br>**1 based (not like JAVA API) --> January = 1 and December = 12**.
-         * @return a list of the events happening **during the specified month**.
          */
-        fun onMonthChange(newYear: Int, newMonth: Int): MutableList<WeekViewEvent>
+        fun onMonthChange(
+            periodToFetch: Int,
+            preNewYear: Int, preNewMonth: Int,
+            newYear: Int, newMonth: Int,
+            nextNewYear: Int, nextNewMonth: Int
+        )
     }
 }

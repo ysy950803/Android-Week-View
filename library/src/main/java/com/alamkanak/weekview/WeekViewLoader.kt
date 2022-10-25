@@ -13,13 +13,12 @@ interface WeekViewLoader {
      * @param instance the date
      * @return The period index in which the date falls (floating point number).
      */
-    fun toWeekViewPeriodIndex(instance: Calendar): Double
+    fun toWeekViewPeriodIndex(instance: Calendar): Int
 
     /**
      * Load the events within the period
      *
      * @param periodIndex the period to load
-     * @return A list with the events of this period
      */
-    fun onLoad(periodIndex: Int): MutableList<WeekViewEvent>
+    fun onLoad(periodIndex: Int)
 }

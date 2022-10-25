@@ -11,18 +11,6 @@
         android:theme="@style/AppTheme">
 
         <activity
-            android:name=".MainActivity"
-            android:exported="true" />
-
-        <activity
-            android:name=".BasicActivity"
-            android:label="@string/title_activity_basic" />
-
-        <activity
-            android:name=".AsynchronousActivity"
-            android:label="@string/title_activity_asynchronous" />
-
-        <activity
             android:name=".CalendarActivity"
             android:exported="true"
             android:theme="@style/MainAppTheme">
