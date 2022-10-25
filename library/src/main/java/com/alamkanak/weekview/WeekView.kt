@@ -77,7 +77,6 @@ class WeekView : View {
     private var mCurrentFlingDirection = Direction.NONE
     private var mFirstVisibleDay: Calendar? = null
     private var mLastVisibleDay: Calendar? = null
-    private var mDefaultEventColor = 0
     private var mMinimumFlingVelocity = 0
     private var mScaledTouchSlop = 0
 
@@ -582,9 +581,6 @@ class WeekView : View {
             textSize = this@WeekView.mEventTextSize.toFloat()
         }
 
-        // Set default event color.
-        mDefaultEventColor = Color.parseColor("#9fc6e7")
-
         mSelectedBubbleMargin = ConvertUtils.dp2px(18f)
         mSelectedBubbleClickPadding = ConvertUtils.dp2px(14f)
         mSelectTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -869,13 +865,11 @@ class WeekView : View {
             // Draw the event and the event name on top of it.
             if (left < right && left < width && top < height && right > mHeaderColumnWidth && bottom > getFirstHourLineY()) {
                 eventRect.rectF = RectF(left, top, right, bottom).also { rectF ->
-                    mEventBackgroundPaint.color =
-                        if (eventRect.event.color == 0) mDefaultEventColor else eventRect.event.color
                     canvas.drawRoundRect(
                         rectF,
                         eventCornerRadius.toFloat(),
                         eventCornerRadius.toFloat(),
-                        mEventBackgroundPaint
+                        mEventBackgroundPaint.withBgColor(eventRect.originalEvent)
                     )
                     // 日程左侧装饰边界线
                     canvas.drawRect(
@@ -883,7 +877,7 @@ class WeekView : View {
                         rectF.top,
                         rectF.left + ConvertUtils.dp2px(2f),
                         rectF.bottom,
-                        mEventBorderPaint
+                        mEventBorderPaint.withBorderColor(eventRect.originalEvent)
                     )
                     drawEventTitle(eventRect.event, rectF, canvas)
                 }
@@ -921,6 +915,7 @@ class WeekView : View {
         val availableHeight = (rect.bottom - rect.top - mEventVPadding * 2).toInt()
         val availableWidth = (rect.right - rect.left - mEventHPadding * 2).toInt()
 
+        mEventTextPaint.withTextColor(event)
         // Get text dimensions.
         var textLayout = StaticLayout(
             bob,
@@ -1517,13 +1512,6 @@ class WeekView : View {
 
     fun setEventPadding(eventPadding: Int) {
         mEventVPadding = eventPadding
-        invalidate()
-    }
-
-    fun getDefaultEventColor(): Int = mDefaultEventColor
-
-    fun setDefaultEventColor(defaultEventColor: Int) {
-        mDefaultEventColor = defaultEventColor
         invalidate()
     }
 

@@ -1,16 +1,88 @@
 package com.alamkanak.weekview
 
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
+import androidx.core.graphics.ColorUtils.setAlphaComponent
 import java.util.Calendar
 
+fun Paint.withBorderColor(event: WeekViewEvent): Paint {
+    val pastEvent = event.endTime < Calendar.getInstance()
+    when (event.status) {
+        WeekViewEvent.Status.CONFIRMED, WeekViewEvent.Status.TENTATIVE -> {
+            this.color =
+                if (pastEvent) setAlphaComponent(event.borderColors[0], 0x66)
+                else event.borderColors[0]
+        }
+        WeekViewEvent.Status.CANCELED -> {
+            this.color =
+                if (pastEvent) setAlphaComponent(event.borderColors[1], 0x66)
+                else event.borderColors[1]
+        }
+    }
+    return this
+}
+
+fun Paint.withBgColor(event: WeekViewEvent): Paint {
+    when (event.status) {
+        WeekViewEvent.Status.CONFIRMED -> {
+            this.shader = null
+            this.color = event.bgColors[0]
+        }
+        WeekViewEvent.Status.CANCELED -> {
+            this.shader = null
+            this.color = event.bgColors[1]
+        }
+        WeekViewEvent.Status.TENTATIVE -> {
+            this.shader = LinearGradient(
+                20f, 20f, 0f, 0f, intArrayOf(
+                    event.baseBgColor, event.baseBgColor, event.bgColors[0], event.bgColors[0]
+                ), floatArrayOf(0f, 0.5f, 0.5f, 1f), Shader.TileMode.REPEAT
+            )
+        }
+    }
+    return this
+}
+
+fun Paint.withTextColor(event: WeekViewEvent): Paint {
+    val pastEvent = event.endTime < Calendar.getInstance()
+    when (event.status) {
+        WeekViewEvent.Status.CONFIRMED, WeekViewEvent.Status.TENTATIVE -> {
+            this.color =
+                if (pastEvent) setAlphaComponent(event.textColors[0], 0x66)
+                else event.textColors[0]
+            this.isStrikeThruText = false
+        }
+        WeekViewEvent.Status.CANCELED -> {
+            this.color =
+                if (pastEvent) setAlphaComponent(event.textColors[1], 0x66)
+                else event.textColors[1]
+            this.isStrikeThruText = true
+        }
+    }
+    return this
+}
+
 class WeekViewEvent {
+
+    enum class Status {
+        CONFIRMED,
+        CANCELED,
+        TENTATIVE
+    }
 
     var id: Long = 0
     lateinit var startTime: Calendar
     lateinit var endTime: Calendar
     var name: String = ""
     var location: String = ""
-    var color = 0
     var isAllDay = false
+
+    var status: Status = Status.TENTATIVE
+    var baseBgColor = 0
+    var borderColors = intArrayOf(0, 0)
+    var bgColors = intArrayOf(0, 0)
+    var textColors = intArrayOf(0, 0)
 
     constructor()
 
@@ -129,7 +201,10 @@ class WeekViewEvent {
                 this[Calendar.MINUTE] = 59
             }
             val event1 = WeekViewEvent(id, name, location, startTime, endTime, isAllDay).apply {
-                this.color = this@WeekViewEvent.color
+                baseBgColor = this@WeekViewEvent.baseBgColor
+                borderColors = this@WeekViewEvent.borderColors
+                bgColors = this@WeekViewEvent.bgColors
+                textColors = this@WeekViewEvent.textColors
             }
             events.add(event1)
 
@@ -149,7 +224,10 @@ class WeekViewEvent {
                 val eventMore = WeekViewEvent(
                     id, name, null, overDay, endOfOverDay, isAllDay
                 ).apply {
-                    this.color = this@WeekViewEvent.color
+                    baseBgColor = this@WeekViewEvent.baseBgColor
+                    borderColors = this@WeekViewEvent.borderColors
+                    bgColors = this@WeekViewEvent.bgColors
+                    textColors = this@WeekViewEvent.textColors
                 }
                 events.add(eventMore)
 
@@ -165,7 +243,10 @@ class WeekViewEvent {
             val event2 = WeekViewEvent(
                 id, name, location, startTime, this.endTime, isAllDay
             ).apply {
-                this.color = this@WeekViewEvent.color
+                baseBgColor = this@WeekViewEvent.baseBgColor
+                borderColors = this@WeekViewEvent.borderColors
+                bgColors = this@WeekViewEvent.bgColors
+                textColors = this@WeekViewEvent.textColors
             }
             events.add(event2)
         } else {

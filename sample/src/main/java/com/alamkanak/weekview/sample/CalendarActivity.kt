@@ -129,7 +129,20 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR, 1)
         }
         events.add(WeekViewEvent(1, "三日视图测试", startTime, endTime).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_5494ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f1f8ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_2c5da7),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
+            status = WeekViewEvent.Status.TENTATIVE
         })
 
         val startTime1 = (startTime.clone() as Calendar).apply {
@@ -141,7 +154,19 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR, 2)
         }
         events.add(WeekViewEvent(2, "三日视图测试1", startTime1, endTime1).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_5494ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f1f8ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_2c5da7),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
         })
 
         val startTime2 = (startTime.clone() as Calendar).apply {
@@ -152,7 +177,20 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR, 1)
         }
         events.add(WeekViewEvent(3, "三日视图测试2", startTime2, endTime2).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_5494ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f1f8ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_2c5da7),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
+            status = WeekViewEvent.Status.CONFIRMED
         })
 
         val startTime3 = (startTime.clone() as Calendar).apply {
@@ -164,7 +202,20 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR, 3)
         }
         events.add(WeekViewEvent(4, "三日视图测试3", startTime3, endTime3).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_5494ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f1f8ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_2c5da7),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
+            status = WeekViewEvent.Status.CANCELED
         })
 
         return events
@@ -186,7 +237,19 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR_OF_DAY, 23)
         }
         events.add(WeekViewEvent(4, "全天日程1", null, startTime, endTime, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_5494ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f1f8ff),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_2c5da7),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
         })
 
         val startTime1 = (startTime.clone() as Calendar)
@@ -195,7 +258,20 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR_OF_DAY, 23)
         }
         events.add(WeekViewEvent(5, "全天日程2", null, startTime1, endTime1, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_ff8628),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_fff4e9),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_c54e00),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
+            status = WeekViewEvent.Status.CONFIRMED
         })
 
         val startTime2 = (startTime.clone() as Calendar).apply {
@@ -206,7 +282,20 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR_OF_DAY, 23)
         }
         events.add(WeekViewEvent(6, "全天日程3", null, startTime2, endTime2, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_ff8628),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_fff4e9),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_c54e00),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
+            status = WeekViewEvent.Status.CANCELED
         })
 
         val startTime3 = (startTime.clone() as Calendar).apply {
@@ -217,7 +306,20 @@ class CalendarActivity : AppCompatActivity() {
             add(Calendar.HOUR_OF_DAY, 23)
         }
         events.add(WeekViewEvent(7, "全天日程4", null, startTime3, endTime3, true).apply {
-            color = ContextCompat.getColor(this@CalendarActivity, R.color.color_FFF4E9)
+            borderColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_ff8628),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_fff4e9),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_c54e00),
+                ContextCompat.getColor(this@CalendarActivity, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(this@CalendarActivity, R.color.color_b3ffffff)
+            status = WeekViewEvent.Status.CONFIRMED
         })
         return events
     }

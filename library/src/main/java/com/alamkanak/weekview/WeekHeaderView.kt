@@ -20,6 +20,7 @@ import android.view.SoundEffectConstants
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.OverScroller
+import androidx.core.content.ContextCompat
 import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator
@@ -73,7 +74,6 @@ class WeekHeaderView : View {
     private var mCurrentFlingDirection = Direction.NONE
     private var mFirstVisibleDay: Calendar? = null
     private var mLastVisibleDay: Calendar? = null
-    private var mDefaultEventColor = 0
     private var mMinimumFlingVelocity = 0
     private var mScaledTouchSlop = 0
 
@@ -371,9 +371,6 @@ class WeekHeaderView : View {
             textSize = mEventTextSize.toFloat()
         }
 
-        // Set default event color.
-        mDefaultEventColor = Color.parseColor("#9fc6e7")
-
         // 除掉全天日程以外的header高度
         val headerTextPaint = mHeaderTextPaint.apply {
             typeface = Typeface.DEFAULT
@@ -630,8 +627,6 @@ class WeekHeaderView : View {
         )
         if (mEventRects.size > 0) {
             for (rect in mEventRects) {
-                mEventBackgroundPaint.color =
-                    if (rect.event.color == 0) mDefaultEventColor else rect.event.color
                 val rectF = RectF(
                     mCurrentOrigin.x + rect.left,
                     mCurrentOrigin.y + rect.top + ConvertUtils.dp2px(2f),
@@ -642,7 +637,8 @@ class WeekHeaderView : View {
                 }
                 // 日程背景
                 canvas.drawRect(
-                    rectF.left, rectF.top, rectF.right, rectF.bottom, mEventBackgroundPaint
+                    rectF.left, rectF.top, rectF.right, rectF.bottom,
+                    mEventBackgroundPaint.withBgColor(rect.originalEvent)
                 )
                 // 日程左侧装饰边界线
                 canvas.drawRect(
@@ -650,7 +646,7 @@ class WeekHeaderView : View {
                     rectF.top,
                     rectF.left + ConvertUtils.dp2px(2f),
                     rectF.bottom,
-                    mEventBorderPaint
+                    mEventBorderPaint.withBorderColor(rect.originalEvent)
                 )
                 // 日程标题
                 drawEventTitle(rect.event, rectF, canvas)
@@ -677,7 +673,7 @@ class WeekHeaderView : View {
             event.name,
             left + mEventHPadding,
             rect.top + mEventVPadding - mEventTextPaint.fontMetrics.ascent,
-            mEventTextPaint
+            mEventTextPaint.withTextColor(event)
         )
         canvas.restore()
     }
@@ -762,7 +758,19 @@ class WeekHeaderView : View {
             this.add(Calendar.HOUR_OF_DAY, 23)
         }
         val testEvent = WeekViewEvent(8, "这个全天日程有一万年", null, startTime0, endTime0, true).apply {
-            this.color = Color.parseColor("#FFFFF4E9")
+            borderColors = intArrayOf(
+                ContextCompat.getColor(context, R.color.color_ff8628),
+                ContextCompat.getColor(context, R.color.color_b4b4b4)
+            )
+            bgColors = intArrayOf(
+                ContextCompat.getColor(context, R.color.color_fff4e9),
+                ContextCompat.getColor(context, R.color.color_f7f8f8)
+            )
+            textColors = intArrayOf(
+                ContextCompat.getColor(context, R.color.color_c54e00),
+                ContextCompat.getColor(context, R.color.color_959595)
+            )
+            baseBgColor = ContextCompat.getColor(context, R.color.color_b3ffffff)
         }
         tempEvents.add(0, EventRect(testEvent, testEvent, null))
 
@@ -1093,13 +1101,6 @@ class WeekHeaderView : View {
     fun setHeaderColumnBackgroundColor(headerColumnBackgroundColor: Int) {
         mHeaderColumnBackgroundColor = headerColumnBackgroundColor
         mHeaderColumnBackgroundPaint.color = mHeaderColumnBackgroundColor
-        invalidate()
-    }
-
-    fun getDefaultEventColor(): Int = mDefaultEventColor
-
-    fun setDefaultEventColor(defaultEventColor: Int) {
-        mDefaultEventColor = defaultEventColor
         invalidate()
     }
 
