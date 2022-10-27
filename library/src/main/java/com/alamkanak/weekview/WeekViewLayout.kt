@@ -14,9 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 @SuppressLint("ClickableViewAccessibility")
@@ -30,7 +28,7 @@ class WeekViewLayout @JvmOverloads constructor(
 
     private lateinit var weekView: WeekView
     private lateinit var weekHeaderView: WeekHeaderView
-    private var weekArrowView: WeekArrowView? = null
+    private lateinit var weekArrowView: WeekArrowView
     private var touchHeader = false
 
     private var mPreviousPeriodEvents: MutableList<WeekViewEvent>? = null
@@ -39,7 +37,7 @@ class WeekViewLayout @JvmOverloads constructor(
     private var mFetchedPeriod = -1 // the middle period the calendar has fetched.
 
     init {
-        inflate(context, R.layout.layout_week_view, this)
+        inflate(context, R.layout.wv_layout_week_view, this)
     }
 
     override fun onAttachedToWindow() {
@@ -54,28 +52,24 @@ class WeekViewLayout @JvmOverloads constructor(
 
     @OnLifecycleEvent(Lifecycle.Event.ON_START)
     private fun onStart() {
-        weekArrowView?.startArrowAnim()
+        weekArrowView.startArrowAnim()
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     private fun onStop() {
-        weekArrowView?.clearArrowAnim()
+        weekArrowView.clearArrowAnim()
     }
 
     override fun onFinishInflate() {
         super.onFinishInflate()
         weekHeaderView = findViewById(R.id.week_header_view)
         weekView = findViewById(R.id.week_view)
-        weekArrowView = findViewById(R.id.week_arrow_view)
-
-        weekArrowView?.apply {
+        weekArrowView = findViewById<WeekArrowView>(R.id.week_arrow_view).apply {
             setUpArrowClickListener { weekView.goToTopEventRect() }
             setDownArrowClickListener { weekView.goToBottomEventRect() }
         }
 
         weekHeaderView.apply {
-            dateTimeInterpreter = createDateTimeInterpreter()
-
             setOnTouchListener { _, _ ->
                 touchHeader = true
                 false
@@ -155,7 +149,6 @@ class WeekViewLayout @JvmOverloads constructor(
                     }
                 }
             }
-            dateTimeInterpreter = createDateTimeInterpreter()
 
             setOnTouchListener { _, _ ->
                 touchHeader = false
@@ -181,39 +174,17 @@ class WeekViewLayout @JvmOverloads constructor(
         }
 
         findViewById<WeekViewContainer>(
-            R.id.weekview_container
+            R.id.week_view_container
         )?.setOnScrollChangeListener(NestedScrollView.OnScrollChangeListener { _, _, _, _, _ ->
             updateArrowVisible()
         })
     }
 
-    private fun createDateTimeInterpreter() = object : DateTimeInterpreter {
-        override fun interpretDate(date: Calendar): List<String> = runCatching {
-            val sdf = SimpleDateFormat("EEE", Locale.getDefault())
-            listOf(
-                if (WeekViewUtil.isSameDay(date, Calendar.getInstance())) "今天" // TODO 翻译
-                else sdf.format(date.time).toUpperCase(Locale.getDefault()),
-                "${date.get(Calendar.DAY_OF_MONTH)}"
-            )
-        }.getOrDefault(listOf("", ""))
-
-        override fun interpretTime(hour: Int, minute: Int): String = runCatching {
-            val calendar = Calendar.getInstance().apply {
-                this[Calendar.HOUR_OF_DAY] = hour
-                this[Calendar.MINUTE] = minute
-            }
-            val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-            sdf.format(calendar.time)
-        }.getOrDefault("")
-    }
-
     private fun updateArrowVisible() {
-        weekArrowView?.apply {
-            setArrowsVisible(
-                !weekView.isTopEventRectVisible(),
-                !weekView.isBottomEventRectVisible()
-            )
-        }
+        weekArrowView.setArrowsVisible(
+            !weekView.isTopEventRectVisible(),
+            !weekView.isBottomEventRectVisible()
+        )
     }
 
     override fun getLifecycle(): Lifecycle = (context as LifecycleOwner).lifecycle

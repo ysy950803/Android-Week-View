@@ -13,8 +13,6 @@ import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextPaint
 import android.text.TextUtils
-import android.text.format.DateFormat
-import android.text.format.DateUtils
 import android.text.style.AbsoluteSizeSpan
 import android.text.style.StyleSpan
 import android.util.AttributeSet
@@ -126,6 +124,8 @@ class WeekView : View {
     private lateinit var mSelectConflictTextPaint: Paint
     private var mTopEventRectY = Float.MAX_VALUE
     private var mBottomEventRectY = Float.MIN_VALUE
+    private var mCurrentDate: Calendar = today()
+        get() = field.clone() as Calendar
 
     private val mGestureListener: SimpleOnGestureListener = object : SimpleOnGestureListener() {
 
@@ -172,16 +172,17 @@ class WeekView : View {
             distanceX: Float,
             distanceY: Float
         ): Boolean {
+            val disX = if (isOneVisibleDay()) 0f else distanceX
             when (mSelectType) {
-                SelectType.MOVE -> onSelectMove(distanceX, distanceY)
+                SelectType.MOVE -> onSelectMove(disX, distanceY)
                 SelectType.TOP_BUBBLE, SelectType.BOTTOM_BUBBLE -> onSelectBubble(distanceY)
                 else -> {
-                    val horizontal = abs(distanceX) > abs(distanceY)
+                    val horizontal = abs(disX) > abs(distanceY)
                     when (mCurrentScrollDirection) {
                         Direction.NONE -> {
                             // Allow scrolling only in one direction.
                             mCurrentScrollDirection = if (horizontal) {
-                                if (distanceX > 0) {
+                                if (disX > 0) {
                                     Direction.LEFT
                                 } else {
                                     Direction.RIGHT
@@ -192,13 +193,13 @@ class WeekView : View {
                         }
                         Direction.LEFT -> {
                             // Change direction if there was enough change.
-                            if (horizontal && distanceX < -mScaledTouchSlop) {
+                            if (horizontal && disX < -mScaledTouchSlop) {
                                 mCurrentScrollDirection = Direction.RIGHT
                             }
                         }
                         Direction.RIGHT -> {
                             // Change direction if there was enough change.
-                            if (horizontal && distanceX > mScaledTouchSlop) {
+                            if (horizontal && disX > mScaledTouchSlop) {
                                 mCurrentScrollDirection = Direction.LEFT
                             }
                         }
@@ -208,7 +209,7 @@ class WeekView : View {
                         Direction.LEFT, Direction.RIGHT -> {
                             clearSelected(false)
                             getContainer()?.setScrollable(false)
-                            mCurrentOrigin.x -= distanceX * xScrollingSpeed
+                            mCurrentOrigin.x -= disX * xScrollingSpeed
                             ViewCompat.postInvalidateOnAnimation(this@WeekView)
                         }
                         Direction.VERTICAL ->
@@ -226,8 +227,9 @@ class WeekView : View {
             velocityX: Float,
             velocityY: Float
         ): Boolean {
-            if (mCurrentFlingDirection == Direction.LEFT && !horizontalFlingEnabled ||
-                mCurrentFlingDirection == Direction.RIGHT && !horizontalFlingEnabled
+            if (isOneVisibleDay()
+                || mCurrentFlingDirection == Direction.LEFT && !horizontalFlingEnabled
+                || mCurrentFlingDirection == Direction.RIGHT && !horizontalFlingEnabled
             ) {
                 return true
             }
@@ -394,7 +396,7 @@ class WeekView : View {
                 scrollView.smoothScrollTo(0, (layoutScrollY + abs(distanceY)).toInt())
             }
             // 左右边界，触发水平滚动（日期切换）
-            if (!mEdgeDelaying) {
+            if (!mEdgeDelaying && !isOneVisibleDay()) {
                 if (rectF.left < mHeaderColumnWidth - mSelectedBubbleMargin) {
                     mEdgeDelaying = true
                     postDelayed(mEdgeDelayRunnable, TimeUnit.SECONDS.toMillis(2))
@@ -526,7 +528,7 @@ class WeekView : View {
 
         // Measure settings for time column.
         mTimeTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textAlign = Paint.Align.RIGHT
+            textAlign = Paint.Align.LEFT
             // 时间轴文本大小
             textSize = ConvertUtils.sp2px(10f).toFloat()
             color = Color.parseColor("#FF888888")
@@ -563,7 +565,7 @@ class WeekView : View {
         }
 
         // Prepare today background color paint.
-        mTodayBackgroundPaint = Paint().apply { color = this@WeekView.mTodayBackgroundColor }
+        mTodayBackgroundPaint = Paint().apply { color = mTodayBackgroundColor }
 
         // Prepare event background color.
         mEventBackgroundPaint = Paint().apply { color = Color.rgb(174, 208, 238) }
@@ -581,7 +583,7 @@ class WeekView : View {
         mSelectedBubbleMargin = ConvertUtils.dp2px(18f)
         mSelectedBubbleClickPadding = ConvertUtils.dp2px(14f)
         mSelectTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textAlign = Paint.Align.RIGHT
+            textAlign = Paint.Align.LEFT
             textSize = ConvertUtils.sp2px(10f).toFloat()
             color = Color.parseColor("#FF00B98F")
             isFakeBoldText = true
@@ -618,16 +620,13 @@ class WeekView : View {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (isOneVisibleDay()) mCurrentOrigin.x = 0f
         drawAllEvents(canvas)
-
         val overlapping = checkSelectOverlapping()
-        drawSelected(canvas, overlapping) // Draw create event view.
-
-        drawTimeColumnAndAxes(
-            canvas,
-            overlapping
-        ) // Draw the time column and all the axes/separators.
-
+        // Draw create event view.
+        drawSelected(canvas, overlapping)
+        // Draw the time column and all the axes/separators.
+        drawTimeColumnAndAxes(canvas, overlapping)
         checkCascadeScrollListener()
     }
 
@@ -637,6 +636,7 @@ class WeekView : View {
         mWidthPerDay = width - mHeaderColumnWidth - mColumnGap * (mNumberOfVisibleDays - 1)
         mWidthPerDay /= mNumberOfVisibleDays
 
+        val curDate = mCurrentDate
         val today = today()
 
         if (mAreDimensionsInvalid) {
@@ -654,8 +654,8 @@ class WeekView : View {
             mIsFirstDraw = false
 
             // If the week view is being drawn for the first time, then consider the first day of the week.
-            if (mNumberOfVisibleDays >= 7 && today[Calendar.DAY_OF_WEEK] != mFirstDayOfWeek && showFirstDayOfWeekFirst) {
-                val difference = today[Calendar.DAY_OF_WEEK] - mFirstDayOfWeek
+            if (mNumberOfVisibleDays >= 7 && curDate[Calendar.DAY_OF_WEEK] != mFirstDayOfWeek && showFirstDayOfWeekFirst) {
+                val difference = curDate[Calendar.DAY_OF_WEEK] - mFirstDayOfWeek
                 mCurrentOrigin.x += (mWidthPerDay + mColumnGap) * difference
             }
         }
@@ -684,7 +684,7 @@ class WeekView : View {
 
         // Iterate through each day.
         val oldFirstVisibleDay = mFirstVisibleDay
-        mFirstVisibleDay = (today.clone() as Calendar).apply {
+        mFirstVisibleDay = (curDate.clone() as Calendar).apply {
             add(
                 Calendar.DATE,
                 -(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)).roundToInt()
@@ -695,13 +695,15 @@ class WeekView : View {
         resetTopBottomEventRectY()
         val nowLineY = getNowLineY()
         var day: Calendar // Prepare to iterate for each day.
-        for (dayNumber in leftDaysWithGaps + 1..leftDaysWithGaps + 1 + mNumberOfVisibleDays) {
+        for (dayNumber in leftDaysWithGaps + 1..leftDaysWithGaps + 1
+            + if (isOneVisibleDay()) 0 else mNumberOfVisibleDays
+        ) {
             // Check if the day is today.
-            day = today.clone() as Calendar
+            day = curDate.clone() as Calendar
             mLastVisibleDay = day.clone() as Calendar
             day.add(Calendar.DATE, dayNumber - 1)
             mLastVisibleDay?.add(Calendar.DATE, dayNumber - 2)
-            val sameDay = isSameDay(day, today)
+            val sameDay = isSameDay(day, curDate)
 
             // Get more events if necessary. We want to store the events 3 months beforehand. Get
             // events only when it is the first iteration of the loop.
@@ -738,7 +740,7 @@ class WeekView : View {
                             height.toFloat(),
                             futurePaint
                         )
-                    } else if (day.before(today)) {
+                    } else if (day.before(curDate)) {
                         canvas.drawRect(
                             start,
                             startY,
@@ -756,10 +758,10 @@ class WeekView : View {
                         )
                     }
                 } else {
-                    // 今天背景色高度
+                    // 今天背景色
                     canvas.drawRect(
                         start, 0f, startPixel + mWidthPerDay, height.toFloat(),
-                        (if (sameDay) mTodayBackgroundPaint else mDayBackgroundPaint)
+                        (if (sameDay && !isOneVisibleDay()) mTodayBackgroundPaint else mDayBackgroundPaint)
                     )
                 }
             }
@@ -787,7 +789,7 @@ class WeekView : View {
             )
 
             // Draw the line at the current time.
-            if (mShowNowLine && sameDay) {
+            if (mShowNowLine && isSameDay(day, today)) {
                 canvas.drawLine(
                     start,
                     nowLineY,
@@ -798,14 +800,14 @@ class WeekView : View {
                 // 时间游标圆点
                 if (startPixel >= mHeaderColumnWidth) {
                     val radius = ConvertUtils.dp2px(3f).toFloat()
-                    canvas.drawCircle(start, nowLineY, radius, mNowLinePaint)
+                    canvas.drawCircle(start + radius, nowLineY, radius, mNowLinePaint)
                 }
             }
 
             // In the next iteration, start from the next day.
             startPixel += mWidthPerDay + mColumnGap
         }
-        canvas.drawLine(
+        if (!isOneVisibleDay()) canvas.drawLine(
             mHeaderColumnWidth,
             nowLineY,
             mHeaderColumnWidth + mWidthPerDay * mNumberOfVisibleDays,
@@ -860,7 +862,7 @@ class WeekView : View {
                         rectF,
                         eventCornerRadius.toFloat(),
                         eventCornerRadius.toFloat(),
-                        mEventBackgroundPaint.withBgColor(eventRect.originalEvent)
+                        mEventBackgroundPaint.withBgStyle(eventRect.originalEvent)
                     )
                     // 日程左侧装饰边界线
                     canvas.drawRect(
@@ -868,7 +870,7 @@ class WeekView : View {
                         rectF.top,
                         rectF.left + ConvertUtils.dp2px(2f),
                         rectF.bottom,
-                        mEventBorderPaint.withBorderColor(eventRect.originalEvent)
+                        mEventBorderPaint.withBorderStyle(eventRect.originalEvent)
                     )
                     drawEventTitle(eventRect.event, rectF, canvas)
                 }
@@ -896,7 +898,7 @@ class WeekView : View {
         val availableHeight = (rect.bottom - rect.top - mEventVPadding * 2).toInt()
         val availableWidth = (rect.right - rect.left - mEventHPadding * 2).toInt()
         val onlyTitle = rect.height() < mHourHeight
-        mEventTextPaint.withTextColor(event)
+        mEventTextPaint.withTextStyle(event)
 
         // Prepare the name of the event.
         val title = SpannableStringBuilder(event.name.replace("\\s+", " ")).apply {
@@ -1000,6 +1002,7 @@ class WeekView : View {
             canvas.restore()
             drawSelectedBubble(canvas, overlapping)
         }
+        drawSelectedTime(canvas, overlapping)
     }
 
     private fun adjustSelectLine(y: Float): Float {
@@ -1053,7 +1056,7 @@ class WeekView : View {
             val time = dateTimeInterpreter.interpretTime(i, 0)
             if (top < height) canvas.drawText(
                 time,
-                mTimeTextWidth + mHeaderColumnPadding,
+                mHeaderColumnWidth - (mTimeTextWidth + mHeaderColumnPadding),
                 top + mTimeTextHeight,
                 mTimeTextPaint
             )
@@ -1082,11 +1085,11 @@ class WeekView : View {
         mSelectTextPaint.color = if (overlapping) -0x28bbd else -0xff4671
         // y = getFirstHourLineY() - mHeaderMarginBottom + mTimeTextHeight = mTimeTextHeight * 3 / 2f
         canvas.drawText(
-            topTime, mTimeTextWidth + mHeaderColumnPadding,
+            topTime, mHeaderColumnWidth - (mTimeTextWidth + mHeaderColumnPadding),
             rectF.top + mTimeTextHeight * 3 / 2f, mSelectTextPaint
         )
         canvas.drawText(
-            bottomTime, mTimeTextWidth + mHeaderColumnPadding,
+            bottomTime, mHeaderColumnWidth - (mTimeTextWidth + mHeaderColumnPadding),
             rectF.bottom + mTimeTextHeight * 3 / 2f, mSelectTextPaint
         )
     }
@@ -1102,10 +1105,12 @@ class WeekView : View {
         val leftDaysWithGaps = -(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)).roundToInt()
         var startPixel = mCurrentOrigin.x + (mWidthPerDay + mColumnGap) * leftDaysWithGaps +
             mHeaderColumnWidth
-        for (dayNumber in leftDaysWithGaps + 1..leftDaysWithGaps + 1 + mNumberOfVisibleDays) {
+        for (dayNumber in leftDaysWithGaps + 1..leftDaysWithGaps + 1
+            + if (isOneVisibleDay()) 0 else mNumberOfVisibleDays
+        ) {
             val start = startPixel.coerceAtLeast(mHeaderColumnWidth)
             if (mWidthPerDay + startPixel - start > 0 && x > start && x < startPixel + mWidthPerDay) {
-                val day = today().apply {
+                val day = mCurrentDate.apply {
                     add(Calendar.DATE, dayNumber - 1)
                     val pixelsFromZero = y - getFirstHourLineY()
                     val hour = (pixelsFromZero / mHourHeight).toInt()
@@ -1333,41 +1338,6 @@ class WeekView : View {
     var emptyViewLongPressListener: EmptyViewLongPressListener? = null
 
     var scrollListener: ScrollListener? = null
-
-    /**
-     * Get/Set the interpreter which provides the text to show in the header column and the header row.
-     */
-    var dateTimeInterpreter: DateTimeInterpreter = object : DateTimeInterpreter {
-        override fun interpretDate(date: Calendar): List<String> = runCatching {
-            // TODO 默认的date显示拦截器
-            val flags = DateUtils.FORMAT_SHOW_DATE or
-                DateUtils.FORMAT_NO_YEAR or
-                DateUtils.FORMAT_NUMERIC_DATE
-            val localizedDate = DateUtils.formatDateTime(context, date.time.time, flags)
-            val sdf = SimpleDateFormat("EEE", Locale.getDefault())
-            listOf(
-                sdf.format(date.time).toUpperCase(Locale.getDefault()),
-                localizedDate
-            )
-        }.getOrDefault(listOf("", ""))
-
-        override fun interpretTime(hour: Int, minute: Int): String = runCatching {
-            val calendar = Calendar.getInstance().apply {
-                this[Calendar.HOUR_OF_DAY] = hour
-                this[Calendar.MINUTE] = minute
-            }
-            val sdf = if (DateFormat.is24HourFormat(context)) SimpleDateFormat(
-                "HH:mm",
-                Locale.getDefault()
-            ) else SimpleDateFormat("hh a", Locale.getDefault())
-            sdf.format(calendar.time)
-        }.getOrDefault("")
-    }
-        set(value) {
-            field = value
-            // Refresh time column width.
-            initTextTimeWidth()
-        }
 
     /**
      * Get the number of visible days in a week.
@@ -1922,4 +1892,11 @@ class WeekView : View {
             if (invalidate) invalidate()
         }
     }
+
+    fun updateCurrentDate(currentDate: Calendar, invalidate: Boolean = false) {
+        mCurrentDate = currentDate
+        if (invalidate) invalidate()
+    }
+
+    private fun isOneVisibleDay() = mNumberOfVisibleDays == 1
 }

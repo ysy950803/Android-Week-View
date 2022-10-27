@@ -10,8 +10,6 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.text.TextPaint
-import android.text.format.DateFormat
-import android.text.format.DateUtils
 import android.util.AttributeSet
 import android.view.GestureDetector.SimpleOnGestureListener
 import android.view.HapticFeedbackConstants
@@ -627,7 +625,7 @@ class WeekHeaderView : View {
                 // 日程背景
                 canvas.drawRect(
                     rectF.left, rectF.top, rectF.right, rectF.bottom,
-                    mEventBackgroundPaint.withBgColor(rect.originalEvent)
+                    mEventBackgroundPaint.withBgStyle(rect.originalEvent)
                 )
                 // 日程左侧装饰边界线
                 canvas.drawRect(
@@ -635,7 +633,7 @@ class WeekHeaderView : View {
                     rectF.top,
                     rectF.left + ConvertUtils.dp2px(2f),
                     rectF.bottom,
-                    mEventBorderPaint.withBorderColor(rect.originalEvent)
+                    mEventBorderPaint.withBorderStyle(rect.originalEvent)
                 )
                 // 日程标题
                 drawEventTitle(rect.event, rectF, canvas)
@@ -662,7 +660,7 @@ class WeekHeaderView : View {
             event.name,
             left + mEventHPadding,
             rect.top + mEventVPadding - mEventTextPaint.fontMetrics.ascent,
-            mEventTextPaint.withTextColor(event)
+            mEventTextPaint.withTextStyle(event)
         )
         canvas.restore()
     }
@@ -859,38 +857,6 @@ class WeekHeaderView : View {
     var weekViewLoader: WeekViewLoader? = null
 
     var scrollListener: ScrollListener? = null
-
-    /**
-     * Get/Set the interpreter which provides the text to show in the header column and the header row.
-     */
-    var dateTimeInterpreter: DateTimeInterpreter = object : DateTimeInterpreter {
-        override fun interpretDate(date: Calendar): List<String> = runCatching {
-            // TODO 默认的date显示拦截器
-            val flags =
-                DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_NO_YEAR or DateUtils.FORMAT_NUMERIC_DATE
-            val localizedDate = DateUtils.formatDateTime(context, date.time.time, flags)
-            val sdf = SimpleDateFormat("EEE", Locale.getDefault())
-            listOf(
-                sdf.format(date.time).toUpperCase(Locale.getDefault()), localizedDate
-            )
-        }.getOrDefault(listOf("", ""))
-
-        override fun interpretTime(hour: Int, minute: Int): String = runCatching {
-            val calendar = Calendar.getInstance().apply {
-                this[Calendar.HOUR_OF_DAY] = hour
-                this[Calendar.MINUTE] = minute
-            }
-            val sdf = if (DateFormat.is24HourFormat(context)) SimpleDateFormat(
-                "HH:mm", Locale.getDefault()
-            ) else SimpleDateFormat("hh a", Locale.getDefault())
-            sdf.format(calendar.time)
-        }.getOrDefault("")
-    }
-        set(value) {
-            field = value
-            // Refresh time column width.
-            initTextTimeWidth()
-        }
 
     /**
      * Get the number of visible days in a week.

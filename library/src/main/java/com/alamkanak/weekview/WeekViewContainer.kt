@@ -17,14 +17,21 @@ class WeekViewContainer @JvmOverloads constructor(
     private var scrollable = true
     private var startX = 0f
     private var startY = 0f
+    private var scrollOpt = false
 
     init {
+        val a = context.theme.obtainStyledAttributes(attrs, R.styleable.WeekViewContainer, 0, 0)
+        try {
+            scrollOpt = a.getBoolean(R.styleable.WeekViewContainer_scrollOptimize, false)
+        } finally {
+            a.recycle()
+        }
         scaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (!scrollable) return false
-        when (ev.action) {
+        if (scrollOpt) when (ev.action) {
             MotionEvent.ACTION_DOWN -> {
                 startX = ev.x
                 startY = ev.y

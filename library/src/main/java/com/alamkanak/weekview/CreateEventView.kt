@@ -20,7 +20,7 @@ class CreateEventView @JvmOverloads constructor(
     private var isConflict = true
 
     init {
-        inflate(context, R.layout.select_layout, this)
+        inflate(context, R.layout.wv_select_layout, this)
         createTextView = findViewById(R.id.create_text)
         createBg = findViewById(R.id.create_bg)
     }
@@ -50,12 +50,12 @@ class CreateEventView @JvmOverloads constructor(
         if (isConflict) {
             createTextView.text = "该时段有人冲突"
             createTextView.setTextColor(Color.parseColor("#FFFD7443"))
-            setCreateBg(if (touching) R.drawable.create_event_bg_red_m else R.drawable.create_event_bg_red)
+            setCreateBg(if (touching) R.drawable.wv_create_event_bg_red_m else R.drawable.wv_create_event_bg_red)
         } else {
             val str = if (textType == 0) "点击新建" else "所有人都有时间"
             createTextView.text = if (showCreateText) str else ""
             createTextView.setTextColor(Color.parseColor("#FF00B38B"))
-            setCreateBg(if (touching) R.drawable.create_event_bg_m else R.drawable.create_event_bg)
+            setCreateBg(if (touching) R.drawable.wv_create_event_bg_m else R.drawable.wv_create_event_bg)
         }
     }
 }

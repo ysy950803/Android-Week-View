@@ -3,45 +3,49 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
     android:orientation="vertical">
 
-    <com.alamkanak.weekview.WeekHeaderView
-        android:id="@+id/week_header_view"
+    <LinearLayout
+        android:id="@+id/all_day_events_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:allDayEventHeight="24dp"
-        app:columnGap="4dp"
-        app:dayBackgroundColor="@android:color/white"
-        app:eventPadding="1dp"
-        app:eventTextColor="@color/color_2c5da7"
-        app:eventTextSize="14sp"
-        app:headerColumnBackground="@android:color/white"
-        app:headerColumnPadding="8dp"
-        app:headerColumnTextColor="#FF333333"
-        app:headerRowBackgroundColor="@android:color/white"
-        app:headerRowPadding="0dp"
-        app:hourHeight="44dp"
-        app:hourSeparatorColor="#FFEBEBEB"
-        app:hourSeparatorHeight="1px"
-        app:noOfVisibleDays="3"
-        app:nowLineColor="#FFFD813C"
-        app:nowLineThickness="1dp"
-        app:showNowLine="true"
-        app:textSize="12sp"
-        app:todayBackgroundColor="#FFFBFBFB"
-        app:todayHeaderTextColor="@color/accent"
-        app:xScrollingSpeed="0.75" />
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="2dp">
+
+        <!--TODO 翻译-->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="25dp"
+            android:layout_marginTop="2dp"
+            android:layout_marginEnd="10dp"
+            android:gravity="center"
+            android:text="全天"
+            android:textColor="#FF888888"
+            android:textSize="10sp" />
+
+        <com.alamkanak.weekview.oneday.AllDayEventsListView
+            android:id="@+id/all_day_events_list_view"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+            app:maxHeight="68dp" />
+
+    </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
         <com.alamkanak.weekview.WeekViewContainer
-            android:id="@+id/weekview_container"
+            android:id="@+id/week_view_container"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:scrollbars="none">
+            android:paddingStart="6dp"
+            android:paddingEnd="16dp"
+            android:scrollbars="none"
+            app:scrollOptimize="false">
 
             <com.alamkanak.weekview.WeekView
                 android:id="@+id/week_view"
@@ -58,10 +62,11 @@
                 app:headerColumnTextColor="#FF333333"
                 app:headerRowBackgroundColor="@android:color/white"
                 app:headerRowPadding="0dp"
+                app:horizontalFlingEnabled="false"
                 app:hourHeight="44dp"
                 app:hourSeparatorColor="#FFEBEBEB"
                 app:hourSeparatorHeight="1px"
-                app:noOfVisibleDays="3"
+                app:noOfVisibleDays="1"
                 app:nowLineColor="#FFFD813C"
                 app:nowLineThickness="1dp"
                 app:showNowLine="true"
@@ -75,12 +80,13 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="6dp"
-            android:background="@drawable/calendar_bottom_shadow" />
+            android:background="@drawable/wv_calendar_bottom_shadow" />
 
         <com.alamkanak.weekview.WeekArrowView
             android:id="@+id/week_arrow_view"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:paddingStart="6dp" />
 
     </FrameLayout>
 

@@ -3,10 +3,11 @@ package com.alamkanak.weekview
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Shader
+import android.widget.TextView
 import androidx.core.graphics.ColorUtils.setAlphaComponent
 import java.util.Calendar
 
-fun Paint.withBorderColor(event: WeekViewEvent): Paint {
+fun Paint.withBorderStyle(event: WeekViewEvent): Paint {
     val pastEvent = event.endTime < Calendar.getInstance()
     when (event.status) {
         WeekViewEvent.Status.CONFIRMED, WeekViewEvent.Status.TENTATIVE -> {
@@ -23,7 +24,7 @@ fun Paint.withBorderColor(event: WeekViewEvent): Paint {
     return this
 }
 
-fun Paint.withBgColor(event: WeekViewEvent): Paint {
+fun Paint.withBgStyle(event: WeekViewEvent): Paint {
     when (event.status) {
         WeekViewEvent.Status.CONFIRMED -> {
             this.shader = null
@@ -44,7 +45,7 @@ fun Paint.withBgColor(event: WeekViewEvent): Paint {
     return this
 }
 
-fun Paint.withTextColor(event: WeekViewEvent): Paint {
+fun Paint.withTextStyle(event: WeekViewEvent): Paint {
     val pastEvent = event.endTime < Calendar.getInstance()
     when (event.status) {
         WeekViewEvent.Status.CONFIRMED, WeekViewEvent.Status.TENTATIVE -> {
@@ -61,6 +62,23 @@ fun Paint.withTextColor(event: WeekViewEvent): Paint {
         }
     }
     return this
+}
+
+fun TextView.withTextStyle(event: WeekViewEvent) {
+    val pastEvent = event.endTime < Calendar.getInstance()
+    paintFlags = when (event.status) {
+        WeekViewEvent.Status.CONFIRMED, WeekViewEvent.Status.TENTATIVE -> {
+            setTextColor(if (pastEvent) setAlphaComponent(event.textColors[0], 0x66)
+            else event.textColors[0])
+            paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+        }
+        WeekViewEvent.Status.CANCELED -> {
+            setTextColor(if (pastEvent) setAlphaComponent(event.textColors[1], 0x66)
+            else event.textColors[1])
+            paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
+        }
+    }
+    text = event.name
 }
 
 class WeekViewEvent {

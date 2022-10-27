@@ -23,7 +23,7 @@ class WeekArrowView @JvmOverloads constructor(
     private var arrowAnimSet: AnimatorSet? = null
 
     init {
-        inflate(context, R.layout.layout_week_arrow_view, this)
+        inflate(context, R.layout.wv_layout_week_arrow_view, this)
     }
 
     override fun onFinishInflate() {

@@ -11,7 +11,7 @@
         android:layout_marginTop="-4dp"
         android:padding="9dp"
         android:scaleType="fitXY"
-        android:src="@mipmap/calendar_remind_arrow_up_down"
+        android:src="@mipmap/wv_calendar_remind_arrow_up_down"
         android:visibility="gone" />
 
     <ImageView
@@ -23,7 +23,7 @@
         android:padding="9dp"
         android:rotation="180"
         android:scaleType="fitXY"
-        android:src="@mipmap/calendar_remind_arrow_up_down"
+        android:src="@mipmap/wv_calendar_remind_arrow_up_down"
         android:visibility="gone" />
 
 </FrameLayout>

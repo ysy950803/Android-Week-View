@@ -5,11 +5,10 @@ import android.content.Context
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.alamkanak.weekview.WeekView
 import com.alamkanak.weekview.WeekViewEvent
 import com.alamkanak.weekview.WeekViewLayout
-import com.alamkanak.weekview.WeekViewUtil
 import com.alamkanak.weekview.WeekViewUtil.today
+import com.alamkanak.weekview.oneday.OneDayWeekViewPager
 import java.util.Calendar
 
 @SuppressLint("ClickableViewAccessibility")
@@ -18,7 +17,17 @@ class CalendarActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_calendar)
-        findViewById<WeekViewLayout>(R.id.week_view_layout)?.eventsLoader = { newYear, newMonth ->
+        findViewById<WeekViewLayout>(
+            R.id.test_week_view_layout
+        )?.eventsLoader = { newYear, newMonth ->
+            mutableListOf<WeekViewEvent>().apply {
+                addAll(getTestEvents(this@CalendarActivity, newYear, newMonth))
+                addAll(getTestAllDayEvents(this@CalendarActivity, newYear, newMonth))
+            }
+        }
+        findViewById<OneDayWeekViewPager>(
+            R.id.test_one_day_week_viewpager
+        )?.eventsLoader = { newYear, newMonth, newDayOfMonth ->
             mutableListOf<WeekViewEvent>().apply {
                 addAll(getTestEvents(this@CalendarActivity, newYear, newMonth))
                 addAll(getTestAllDayEvents(this@CalendarActivity, newYear, newMonth))
