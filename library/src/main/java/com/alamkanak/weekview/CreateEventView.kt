@@ -6,7 +6,11 @@ import android.util.AttributeSet
 import android.widget.LinearLayout
 import android.widget.TextView
 
-class CreateEventView : LinearLayout {
+class CreateEventView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : LinearLayout(context, attrs, defStyleAttr) {
 
     private var createTextView: TextView
     private var createBg: LinearLayout
@@ -14,16 +18,6 @@ class CreateEventView : LinearLayout {
     private var newHeight = -1
     private var showCreateText = true
     private var isConflict = true
-
-    constructor(context: Context?) : super(context)
-
-    constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
-
-    constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(
-        context,
-        attrs,
-        defStyleAttr
-    )
 
     init {
         inflate(context, R.layout.select_layout, this)
@@ -44,15 +38,7 @@ class CreateEventView : LinearLayout {
         requestLayout()
     }
 
-    fun calculate() {
-        if (height / createTextView.lineHeight > 1) {
-            createTextView.visibility = VISIBLE
-        } else {
-            createTextView.visibility = GONE
-        }
-    }
-
-    fun setCreateBg(resId: Int) {
+    private fun setCreateBg(resId: Int) {
         createBg.setBackgroundResource(resId)
     }
 
@@ -60,6 +46,7 @@ class CreateEventView : LinearLayout {
         isConflict = conflict
         this.showCreateText = showCreateText
         createTextView.visibility = VISIBLE
+        // TODO 翻译
         if (isConflict) {
             createTextView.text = "该时段有人冲突"
             createTextView.setTextColor(Color.parseColor("#FFFD7443"))

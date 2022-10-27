@@ -1,24 +1,15 @@
 package com.alamkanak.weekview
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
-import android.view.LayoutInflater
-import android.view.View
-import android.widget.ImageView
 import android.widget.LinearLayout
-import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.OnLifecycleEvent
 import androidx.lifecycle.lifecycleScope
-import com.blankj.utilcode.util.ConvertUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -29,15 +20,17 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 @SuppressLint("ClickableViewAccessibility")
-class WeekViewLayout : LinearLayout, LifecycleObserver, LifecycleOwner {
+class WeekViewLayout @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : LinearLayout(context, attrs, defStyleAttr), LifecycleObserver, LifecycleOwner {
 
     var eventsLoader: ((newYear: Int, newMonth: Int) -> MutableList<WeekViewEvent>)? = null
 
     private lateinit var weekView: WeekView
     private lateinit var weekHeaderView: WeekHeaderView
-    private var upArrow: ImageView? = null
-    private var downArrow: ImageView? = null
-    private var arrowAnimSet: AnimatorSet? = null
+    private var weekArrowView: WeekArrowView? = null
     private var touchHeader = false
 
     private var mPreviousPeriodEvents: MutableList<WeekViewEvent>? = null
@@ -45,16 +38,8 @@ class WeekViewLayout : LinearLayout, LifecycleObserver, LifecycleOwner {
     private var mNextPeriodEvents: MutableList<WeekViewEvent>? = null
     private var mFetchedPeriod = -1 // the middle period the calendar has fetched.
 
-    constructor(context: Context) : this(context, null)
-
-    constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
-
-    constructor(context: Context, attrs: AttributeSet?, defStyleAttr: Int) : super(
-        context,
-        attrs,
-        defStyleAttr
-    ) {
-        LayoutInflater.from(context).inflate(R.layout.layout_weekview, this, true)
+    init {
+        inflate(context, R.layout.layout_week_view, this)
     }
 
     override fun onAttachedToWindow() {
@@ -69,22 +54,24 @@ class WeekViewLayout : LinearLayout, LifecycleObserver, LifecycleOwner {
 
     @OnLifecycleEvent(Lifecycle.Event.ON_START)
     private fun onStart() {
-        startArrowAnim()
+        weekArrowView?.startArrowAnim()
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     private fun onStop() {
-        clearArrowAnim()
+        weekArrowView?.clearArrowAnim()
     }
 
     override fun onFinishInflate() {
         super.onFinishInflate()
         weekHeaderView = findViewById(R.id.week_header_view)
         weekView = findViewById(R.id.week_view)
-        upArrow = findViewById(R.id.iv_remind_up_arrow)
-        downArrow = findViewById(R.id.iv_remind_down_arrow)
-        upArrow?.setOnClickListener { weekView.goToTopEventRect() }
-        downArrow?.setOnClickListener { weekView.goToBottomEventRect() }
+        weekArrowView = findViewById(R.id.week_arrow_view)
+
+        weekArrowView?.apply {
+            setUpArrowClickListener { weekView.goToTopEventRect() }
+            setDownArrowClickListener { weekView.goToBottomEventRect() }
+        }
 
         weekHeaderView.apply {
             dateTimeInterpreter = createDateTimeInterpreter()
@@ -221,53 +208,12 @@ class WeekViewLayout : LinearLayout, LifecycleObserver, LifecycleOwner {
     }
 
     private fun updateArrowVisible() {
-        upArrow?.isVisible = !weekView.isTopEventRectVisible()
-        downArrow?.isVisible = !weekView.isBottomEventRectVisible()
-    }
-
-    private fun startArrowAnim() {
-        val height = ConvertUtils.dp2px(6f).toFloat()
-        val u1 = ObjectAnimator.ofFloat(upArrow, View.TRANSLATION_Y, 0f, height)
-        val u2 = ObjectAnimator.ofFloat(upArrow, View.ALPHA, 0.4f, 1f)
-        val u3 = ObjectAnimator.ofFloat(upArrow, View.TRANSLATION_Y, height, 0f)
-        val u4 = ObjectAnimator.ofFloat(upArrow, View.ALPHA, 1f, 0.4f)
-        val b1 = ObjectAnimator.ofFloat(downArrow, View.TRANSLATION_Y, 0f, height)
-        val b2 = ObjectAnimator.ofFloat(downArrow, View.ALPHA, 0.4f, 1f)
-        val b3 = ObjectAnimator.ofFloat(downArrow, View.TRANSLATION_Y, height, 0f)
-        val b4 = ObjectAnimator.ofFloat(downArrow, View.ALPHA, 1f, 0.4f)
-        val up1 = AnimatorSet().apply { play(u3).with(u2) }
-        val up2 = AnimatorSet().apply { play(u1).with(u4) }
-        val upSet = AnimatorSet().apply { playSequentially(up1, up2) }
-        val bottom1 = AnimatorSet().apply { play(b1).with(b2) }
-        val bottom2 = AnimatorSet().apply { play(b3).with(b4) }
-        val bottomSet = AnimatorSet().apply { playSequentially(bottom1, bottom2) }
-        arrowAnimSet = AnimatorSet().apply {
-            play(upSet).with(bottomSet)
-            addListener(object : AnimatorListenerAdapter() {
-                private var canceled = false
-                override fun onAnimationEnd(animation: Animator) {
-                    if (!canceled) {
-                        animation.start()
-                    }
-                }
-
-                override fun onAnimationCancel(animation: Animator) {
-                    canceled = true
-                }
-            })
-            duration = 600L
-            start()
+        weekArrowView?.apply {
+            setArrowsVisible(
+                !weekView.isTopEventRectVisible(),
+                !weekView.isBottomEventRectVisible()
+            )
         }
-    }
-
-    private fun clearArrowAnim() {
-        upArrow?.clearAnimation()
-        downArrow?.clearAnimation()
-        arrowAnimSet?.run {
-            removeAllListeners()
-            cancel()
-        }
-        arrowAnimSet = null
     }
 
     override fun getLifecycle(): Lifecycle = (context as LifecycleOwner).lifecycle

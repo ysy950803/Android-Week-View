@@ -13,13 +13,13 @@ class WeekViewContainer @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : NestedScrollView(context, attrs, defStyleAttr) {
 
+    private val scaledTouchSlop: Int
     private var scrollable = true
-    private val mScaledTouchSlop: Int
     private var startX = 0f
     private var startY = 0f
 
     init {
-        mScaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
+        scaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
@@ -32,7 +32,7 @@ class WeekViewContainer @JvmOverloads constructor(
             MotionEvent.ACTION_MOVE -> {
                 val distanceX = abs(ev.x - startX)
                 val distanceY = abs(ev.y - startY)
-                if (distanceX > mScaledTouchSlop && distanceX * 2f > distanceY) {
+                if (distanceX > scaledTouchSlop && distanceX * 2f > distanceY) {
                     // 判断为横向滑动
                     return false
                 }

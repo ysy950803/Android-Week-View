@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/iv_remind_up_arrow"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="36dp"
+        android:layout_marginTop="-4dp"
+        android:padding="9dp"
+        android:scaleType="fitXY"
+        android:src="@mipmap/calendar_remind_arrow_up_down"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/iv_remind_down_arrow"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="36dp"
+        android:padding="9dp"
+        android:rotation="180"
+        android:scaleType="fitXY"
+        android:src="@mipmap/calendar_remind_arrow_up_down"
+        android:visibility="gone" />
+
+</FrameLayout>
