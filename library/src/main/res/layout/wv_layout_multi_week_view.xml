@@ -14,7 +14,7 @@
         app:columnGap="4dp"
         app:dayBackgroundColor="@android:color/white"
         app:eventPadding="1dp"
-        app:eventTextColor="@color/color_2c5da7"
+        app:eventTextColor="#2C5DA7"
         app:eventTextSize="14sp"
         app:headerColumnBackground="@android:color/white"
         app:headerColumnPadding="8dp"
@@ -30,8 +30,8 @@
         app:showNowLine="true"
         app:textSize="12sp"
         app:todayBackgroundColor="#FFFBFBFB"
-        app:todayHeaderTextColor="@color/accent"
-        app:xScrollingSpeed="0.75" />
+        app:todayHeaderTextColor="#FF7D41"
+        app:xScrollingSpeed="0.5" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -51,8 +51,9 @@
                 app:allDayEventHeight="24dp"
                 app:columnGap="4dp"
                 app:dayBackgroundColor="@android:color/white"
+                app:eventMarginVertical="0.5dp"
                 app:eventPadding="1dp"
-                app:eventTextColor="@color/color_2c5da7"
+                app:eventTextColor="#2C5DA7"
                 app:eventTextSize="14sp"
                 app:headerColumnBackground="@android:color/white"
                 app:headerColumnPadding="8dp"
@@ -68,8 +69,8 @@
                 app:showNowLine="true"
                 app:textSize="12sp"
                 app:todayBackgroundColor="#FFFBFBFB"
-                app:todayHeaderTextColor="@color/accent"
-                app:xScrollingSpeed="0.75" />
+                app:todayHeaderTextColor="#FF7D41"
+                app:xScrollingSpeed="0.5" />
 
         </com.alamkanak.weekview.WeekViewContainer>
 

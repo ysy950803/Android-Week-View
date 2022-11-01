@@ -18,31 +18,28 @@ class WeekArrowView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    private var upArrow: ImageView? = null
-    private var downArrow: ImageView? = null
+    private val upArrow: ImageView
+    private val downArrow: ImageView
     private var arrowAnimSet: AnimatorSet? = null
 
     init {
         inflate(context, R.layout.wv_layout_week_arrow_view, this)
-    }
 
-    override fun onFinishInflate() {
-        super.onFinishInflate()
         upArrow = findViewById(R.id.iv_remind_up_arrow)
         downArrow = findViewById(R.id.iv_remind_down_arrow)
     }
 
     fun setUpArrowClickListener(listener: OnClickListener) {
-        upArrow?.setOnClickListener(listener)
+        upArrow.setOnClickListener(listener)
     }
 
     fun setDownArrowClickListener(listener: OnClickListener) {
-        downArrow?.setOnClickListener(listener)
+        downArrow.setOnClickListener(listener)
     }
 
     fun setArrowsVisible(upVisible: Boolean, downVisible: Boolean) {
-        upArrow?.isVisible = upVisible
-        downArrow?.isVisible = downVisible
+        upArrow.isVisible = upVisible
+        downArrow.isVisible = downVisible
     }
 
     fun startArrowAnim() {
@@ -81,8 +78,8 @@ class WeekArrowView @JvmOverloads constructor(
     }
 
     fun clearArrowAnim() {
-        upArrow?.clearAnimation()
-        downArrow?.clearAnimation()
+        upArrow.clearAnimation()
+        downArrow.clearAnimation()
         arrowAnimSet?.run {
             removeAllListeners()
             cancel()

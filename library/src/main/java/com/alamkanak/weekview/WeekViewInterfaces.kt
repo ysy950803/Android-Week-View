@@ -1,6 +1,8 @@
 package com.alamkanak.weekview
 
 import android.graphics.RectF
+import com.alamkanak.weekview.WeekViewEvent
+import com.alamkanak.weekview.WeekViewUtil
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -8,10 +10,8 @@ import java.util.Locale
 interface EmptyViewClickListener {
     /**
      * Triggered when the users clicks on a empty space of the calendar.
-     *
-     * @param time: [Calendar] object set with the date and time of the clicked position on the view.
      */
-    fun onEmptyViewClicked(time: Calendar)
+    fun onEmptyViewClicked(starTime: Calendar, endTime: Calendar)
 }
 
 interface EmptyViewLongPressListener {

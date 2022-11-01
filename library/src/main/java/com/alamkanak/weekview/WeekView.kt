@@ -29,7 +29,6 @@ import androidx.interpolator.view.animation.FastOutLinearInInterpolator
 import com.alamkanak.weekview.WeekViewUtil.isFloatEqual
 import com.alamkanak.weekview.WeekViewUtil.isSameDay
 import com.alamkanak.weekview.WeekViewUtil.obtainStaticLayout
-import com.alamkanak.weekview.WeekViewUtil.performPressVibrate
 import com.alamkanak.weekview.WeekViewUtil.today
 import com.blankj.utilcode.util.ConvertUtils
 import java.text.SimpleDateFormat
@@ -44,6 +43,13 @@ import kotlin.math.roundToInt
 
 @Suppress("unused")
 class WeekView : View {
+
+    companion object {
+        var initCurDate: Calendar = today()
+            get() = field.clone() as Calendar
+        var selectStartTime: Calendar? = null
+        var selectEndTime: Calendar? = null
+    }
 
     private lateinit var mTimeTextPaint: Paint
     private var mTimeTextWidth = 0f
@@ -102,7 +108,7 @@ class WeekView : View {
     private var mOverlappingEventGap = 0
     private var mEventMarginVertical = 0
     private var mScrollToDay: Calendar? = null
-    private var mScrollToHour = -1.0
+    private var mScrollToHour = -1
     private var mShowDistinctWeekendColor = false
     private var mShowNowLine = false
     private var mShowDistinctPastFutureColor = false
@@ -124,7 +130,7 @@ class WeekView : View {
     private lateinit var mSelectConflictTextPaint: Paint
     private var mTopEventRectY = Float.MAX_VALUE
     private var mBottomEventRectY = Float.MIN_VALUE
-    private var mCurrentDate: Calendar = today()
+    var currentDate: Calendar = today()
         get() = field.clone() as Calendar
 
     private val mGestureListener: SimpleOnGestureListener = object : SimpleOnGestureListener() {
@@ -148,10 +154,10 @@ class WeekView : View {
                     rectF.right, rectF.bottom + getFirstHourLineY()
                 )
                 mSelectType = if (topBubble.contains(e.x, e.y)) {
-                    performPressVibrate(this@WeekView)
+                    performPressVibrate()
                     SelectType.TOP_BUBBLE
                 } else if (bottomBubble.contains(e.x, e.y)) {
-                    performPressVibrate(this@WeekView)
+                    performPressVibrate()
                     SelectType.BOTTOM_BUBBLE
                 } else if (selectedRectF.contains(e.x, e.y)) {
                     SelectType.MOVE
@@ -257,8 +263,12 @@ class WeekView : View {
 
         override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
             if (isClickSelected(e)) {
-                eventClickListener?.let { listener ->
-                    // TODO 点击“新建日程”区域
+                // 点击“新建日程”区域
+                emptyViewClickListener?.let { listener ->
+                    val sT = selectStartTime ?: return@let
+                    val eT = selectEndTime ?: return@let
+                    listener.onEmptyViewClicked(sT, eT)
+                    performPressVibrate()
                 }
             } else {
                 // If the tap was on an event then trigger the callback.
@@ -271,18 +281,8 @@ class WeekView : View {
                             && e.y < rectF.bottom
                         ) {
                             listener.onEventClick(event.originalEvent, rectF)
-                            playSoundEffect(SoundEffectConstants.CLICK)
+                            performPressVibrate()
                             return super.onSingleTapConfirmed(e)
-                        }
-                    }
-                }
-
-                // If the tap was on in an empty space, then trigger the callback.
-                emptyViewClickListener?.let { listener ->
-                    if (e.x > mHeaderColumnWidth && e.y > mHeaderMarginBottom) {
-                        getTimeFromPoint(e.x, e.y)?.let { selectedTime ->
-                            playSoundEffect(SoundEffectConstants.CLICK)
-                            listener.onEmptyViewClicked(selectedTime)
                         }
                     }
                 }
@@ -290,7 +290,7 @@ class WeekView : View {
                 // 点击空白区域
                 if (mSelectedRectF == null) {
                     reLocationSelectedRectF(e, true)
-                    performPressVibrate(this@WeekView)
+                    performPressVibrate()
                     invalidate()
                 } else {
                     clearSelected(true)
@@ -313,16 +313,6 @@ class WeekView : View {
                         listener.onEventLongPress(event.originalEvent, rectF)
                         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                         return
-                    }
-                }
-            }
-
-            // If the tap was on in an empty space, then trigger the callback.
-            emptyViewLongPressListener?.let { listener ->
-                if (e.x > mHeaderColumnWidth && e.y > mHeaderMarginBottom) {
-                    getTimeFromPoint(e.x, e.y)?.let { selectedTime ->
-                        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        listener.onEmptyViewLongPress(selectedTime)
                     }
                 }
             }
@@ -429,6 +419,8 @@ class WeekView : View {
         attrs,
         defStyleAttr
     ) {
+        selectStartTime = null
+        selectEndTime = null
         // Get the attribute values (if any).
         val a = context.theme.obtainStyledAttributes(attrs, R.styleable.WeekView, 0, 0)
         try {
@@ -615,7 +607,10 @@ class WeekView : View {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        setMeasuredDimension(widthMeasureSpec, (getFirstHourLineY() + mHourHeight * 24).toInt())
+        setMeasuredDimension(
+            widthMeasureSpec,
+            (getFirstHourLineY() + mHourHeight * 24 + ConvertUtils.dp2px(6f)).toInt()
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -636,7 +631,7 @@ class WeekView : View {
         mWidthPerDay = width - mHeaderColumnWidth - mColumnGap * (mNumberOfVisibleDays - 1)
         mWidthPerDay /= mNumberOfVisibleDays
 
-        val curDate = mCurrentDate
+        val curDate = currentDate
         val today = today()
 
         if (mAreDimensionsInvalid) {
@@ -647,7 +642,7 @@ class WeekView : View {
             if (mScrollToHour >= 0) goToHour(mScrollToHour)
 
             mScrollToDay = null
-            mScrollToHour = -1.0
+            mScrollToHour = -1
             mAreDimensionsInvalid = false
         }
         if (mIsFirstDraw) {
@@ -685,10 +680,7 @@ class WeekView : View {
         // Iterate through each day.
         val oldFirstVisibleDay = mFirstVisibleDay
         mFirstVisibleDay = (curDate.clone() as Calendar).apply {
-            add(
-                Calendar.DATE,
-                -(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)).roundToInt()
-            )
+            add(Calendar.DATE, -(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)).roundToInt())
         }
 
         dayHasEvents.clear()
@@ -892,16 +884,17 @@ class WeekView : View {
      * @param canvas The canvas to draw upon.
      */
     private fun drawEventTitle(event: WeekViewEvent, rect: RectF, canvas: Canvas) {
-        if (rect.right - rect.left - mEventHPadding * 2 < 0) return
-        if (rect.bottom - rect.top - mEventVPadding * 2 < 0) return
+        if (rect.width() - mEventHPadding * 1.5f < 0) return
+        if (rect.height() + mEventMarginVertical * 2 - mEventVPadding * 1.5f < 0) return
 
-        val availableHeight = (rect.bottom - rect.top - mEventVPadding * 2).toInt()
-        val availableWidth = (rect.right - rect.left - mEventHPadding * 2).toInt()
+        val availableWidth = (rect.width() - mEventHPadding * 1.5f).toInt()
+        val availableHeight =
+            (rect.height() + mEventMarginVertical * 2 - mEventVPadding * 1.5f).toInt()
         val onlyTitle = rect.height() < mHourHeight
         mEventTextPaint.withTextStyle(event)
 
         // Prepare the name of the event.
-        val title = SpannableStringBuilder(event.name.replace("\\s+", " ")).apply {
+        val title = SpannableStringBuilder(event.name.replace(Regex("\\s+"), " ")).apply {
             setSpan(
                 AbsoluteSizeSpan(ConvertUtils.sp2px(14f)),
                 0,
@@ -911,7 +904,7 @@ class WeekView : View {
             setSpan(StyleSpan(Typeface.BOLD), 0, length, 0)
         }
         // Prepare the location of the event.
-        val location = SpannableStringBuilder(event.location.replace("[\n\r]", " ")).apply {
+        val location = SpannableStringBuilder(event.location.replace(Regex("[\n\r]"), " ")).apply {
             setSpan(
                 AbsoluteSizeSpan(ConvertUtils.sp2px(12f)),
                 0,
@@ -943,9 +936,12 @@ class WeekView : View {
                 val subTitle = title.subSequence(0, title.length - ellipsisCount)
                 titleLayout = obtainStaticLayout(subTitle, mEventTextPaint, availableWidth)
             }
+
             // Draw text.
+            val rectTop =
+                rect.top + (if (rect.height() * 2 <= mHourHeight) 0 else mEventVPadding) + ConvertUtils.dp2px(1f)
             canvas.save()
-            canvas.translate(rect.left + mEventHPadding, rect.top + mEventVPadding)
+            canvas.translate(rect.left + mEventHPadding, rectTop)
             titleLayout.draw(canvas)
             canvas.restore()
 
@@ -963,7 +959,7 @@ class WeekView : View {
                 canvas.save()
                 canvas.translate(
                     rect.left + mEventHPadding,
-                    rect.top + mEventVPadding + titleLayout.height
+                    paddingTop + rect.top + mEventVPadding + titleLayout.height
                 )
                 locationLayout.draw(canvas)
                 canvas.restore()
@@ -1092,6 +1088,8 @@ class WeekView : View {
             bottomTime, mHeaderColumnWidth - (mTimeTextWidth + mHeaderColumnPadding),
             rectF.bottom + mTimeTextHeight * 3 / 2f, mSelectTextPaint
         )
+        selectStartTime = top
+        selectEndTime = bottom
     }
 
     /**
@@ -1110,7 +1108,7 @@ class WeekView : View {
         ) {
             val start = startPixel.coerceAtLeast(mHeaderColumnWidth)
             if (mWidthPerDay + startPixel - start > 0 && x > start && x < startPixel + mWidthPerDay) {
-                val day = mCurrentDate.apply {
+                val day = currentDate.apply {
                     add(Calendar.DATE, dayNumber - 1)
                     val pixelsFromZero = y - getFirstHourLineY()
                     val hour = (pixelsFromZero / mHourHeight).toInt()
@@ -1145,31 +1143,36 @@ class WeekView : View {
     /**
      * Refreshes the view and loads the events again.
      */
-    fun notifyDatasetChanged(data: MutableList<WeekViewEvent>) {
-        // Clear events.
-        mEventRects.clear()
-        sortAndCacheEvents(data)
-        // Prepare to calculate positions of each events.
-        val tempEvents = mEventRects
-        mEventRects = mutableListOf()
-        // Iterate through each day with events to calculate the position of the events.
-        while (tempEvents.size > 0) {
-            val eventRects = ArrayList<EventRect>(tempEvents.size)
-            // Get first event for a day.
-            val eventRect1 = tempEvents.removeAt(0)
-            eventRects.add(eventRect1)
-            var i = 0
-            while (i < tempEvents.size) {
-                // Collect all other events for same day.
-                val eventRect2 = tempEvents[i]
-                if (isSameDay(eventRect1.event.startTime, eventRect2.event.startTime)) {
-                    tempEvents.removeAt(i)
-                    eventRects.add(eventRect2)
-                } else {
-                    i++
+    fun notifyDatasetChanged(data: MutableList<WeekViewEvent>? = null) {
+        clearSelected(false)
+        if (data == null) {
+            mFetchedPeriod = -1
+        } else {
+            // Clear events.
+            mEventRects.clear()
+            sortAndCacheEvents(data)
+            // Prepare to calculate positions of each events.
+            val tempEvents = mEventRects
+            mEventRects = mutableListOf()
+            // Iterate through each day with events to calculate the position of the events.
+            while (tempEvents.size > 0) {
+                val eventRects = ArrayList<EventRect>(tempEvents.size)
+                // Get first event for a day.
+                val eventRect1 = tempEvents.removeAt(0)
+                eventRects.add(eventRect1)
+                var i = 0
+                while (i < tempEvents.size) {
+                    // Collect all other events for same day.
+                    val eventRect2 = tempEvents[i]
+                    if (isSameDay(eventRect1.event.startTime, eventRect2.event.startTime)) {
+                        tempEvents.removeAt(i)
+                        eventRects.add(eventRect2)
+                    } else {
+                        i++
+                    }
                 }
+                computePositionOfEvents(eventRects)
             }
-            computePositionOfEvents(eventRects)
         }
         invalidate()
     }
@@ -1334,8 +1337,6 @@ class WeekView : View {
     var weekViewLoader: WeekViewLoader? = null
 
     var emptyViewClickListener: EmptyViewClickListener? = null
-
-    var emptyViewLongPressListener: EmptyViewLongPressListener? = null
 
     var scrollListener: ScrollListener? = null
 
@@ -1632,7 +1633,7 @@ class WeekView : View {
                     reLocationSelectedRectF(event, false)
                 }
                 mSelectType = SelectType.NONE
-                performPressVibrate(this)
+                performPressVibrate()
                 invalidate()
             }
         }
@@ -1756,7 +1757,7 @@ class WeekView : View {
                 0,
                 dX.toInt(),
                 0,
-                (abs(dX) / mWidthPerDay * scrollDuration).toInt()
+                // (abs(dX) / mWidthPerDay * scrollDuration).toInt()
             )
             ViewCompat.postInvalidateOnAnimation(this@WeekView)
         } else {
@@ -1770,7 +1771,7 @@ class WeekView : View {
      *
      * @param hour The hour to scroll to in 24-hour format. Supported values are 0-24.
      */
-    fun goToHour(hour: Double) {
+    fun goToHour(hour: Int) {
         val container = getContainer() ?: return
         if (mAreDimensionsInvalid) {
             mScrollToHour = hour
@@ -1778,7 +1779,7 @@ class WeekView : View {
         }
         val verticalOffset = when {
             hour > 24 -> mHourHeight * 24
-            hour > 0 -> (mHourHeight * hour).toInt()
+            hour > 0 -> mHourHeight * hour
             else -> 0
         }
         verticalOffset.coerceAtMost((getFirstHourLineY() + mHourHeight * 24 - container.height).toInt())
@@ -1886,16 +1887,11 @@ class WeekView : View {
         }
     }
 
-    private fun clearSelected(invalidate: Boolean) {
+    fun clearSelected(invalidate: Boolean) {
         if (mSelectedRectF != null) {
             mSelectedRectF = null
             if (invalidate) invalidate()
         }
-    }
-
-    fun updateCurrentDate(currentDate: Calendar, invalidate: Boolean = false) {
-        mCurrentDate = currentDate
-        if (invalidate) invalidate()
     }
 
     private fun isOneVisibleDay() = mNumberOfVisibleDays == 1

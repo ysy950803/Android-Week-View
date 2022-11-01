@@ -5,6 +5,7 @@ import android.util.AttributeSet
 import androidx.recyclerview.widget.RecyclerView
 import com.alamkanak.weekview.R
 import com.alamkanak.weekview.WeekViewEvent
+import com.alamkanak.weekview.performPressVibrate
 import com.chad.library.adapter.base.BaseQuickAdapter
 import com.chad.library.adapter.base.viewholder.BaseViewHolder
 
@@ -14,6 +15,7 @@ class AllDayEventsListView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : RecyclerView(context, attrs, defStyleAttr) {
 
+    var itemClickListener: ((weekViewEvent: WeekViewEvent) -> Unit)? = null
     private var maxHeight: Int = 0
 
     init {
@@ -36,12 +38,19 @@ class AllDayEventsListView @JvmOverloads constructor(
     }
 
     fun setData(data: MutableList<WeekViewEvent>) {
-        (adapter as? InnerListAdapter)?.setNewInstance(data)
+        (adapter as? InnerListAdapter)?.setNewData(data)
     }
 
     private inner class InnerListAdapter : BaseQuickAdapter<WeekViewEvent, BaseViewHolder>(
         R.layout.wv_item_all_day_events
     ) {
+        init {
+            setOnItemClickListener { _, _, position ->
+                getItem(position)?.run { itemClickListener?.invoke(this) }
+                performPressVibrate()
+            }
+        }
+
         override fun convert(holder: BaseViewHolder, item: WeekViewEvent) {
             (holder.itemView as? AllDayEventsItemView)?.updateData(item)
         }

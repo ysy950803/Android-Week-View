@@ -22,14 +22,11 @@ import androidx.core.view.GestureDetectorCompat
 import androidx.core.view.ViewCompat
 import androidx.interpolator.view.animation.FastOutLinearInInterpolator
 import com.alamkanak.weekview.WeekViewUtil.allDaysBetween
-import com.alamkanak.weekview.WeekViewUtil.isContainsAllDay
 import com.alamkanak.weekview.WeekViewUtil.isFloatEqual
 import com.alamkanak.weekview.WeekViewUtil.isSameDay
 import com.alamkanak.weekview.WeekViewUtil.today
 import com.blankj.utilcode.util.ConvertUtils
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -201,7 +198,7 @@ class WeekHeaderView : View {
                         && e.y < rectF.bottom
                     ) {
                         listener.onEventClick(event.originalEvent, rectF)
-                        playSoundEffect(SoundEffectConstants.CLICK)
+                        performPressVibrate()
                         return super.onSingleTapConfirmed(e)
                     }
                 }
@@ -420,7 +417,7 @@ class WeekHeaderView : View {
                 val day = mFirstVisibleDay?.clone() as? Calendar ?: continue
                 day.add(Calendar.DATE, dayNumber)
                 for (rect in mEventRects) {
-                    if (isContainsAllDay(day, rect.event)) {
+                    if (day.containsAllDay(rect.event)) {
                         maxAllDayRowCount = maxAllDayRowCount.coerceAtLeast(rect.row)
                     }
                 }
@@ -478,9 +475,7 @@ class WeekHeaderView : View {
         // Iterate through each day.
         val oldFirstVisibleDay = mFirstVisibleDay
         mFirstVisibleDay = (today.clone() as Calendar).apply {
-            add(
-                Calendar.DATE, -(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)).roundToInt()
-            )
+            add(Calendar.DATE, -(mCurrentOrigin.x / (mWidthPerDay + mColumnGap)).roundToInt())
         }
 
         var day: Calendar // Prepare to iterate for each day.
@@ -593,7 +588,7 @@ class WeekHeaderView : View {
         var hasEvent = false
         if (mEventRects.isNotEmpty()) {
             for (rect in mEventRects) {
-                hasEvent = isContainsAllDay(date, rect.event) || hasEvent
+                hasEvent = date.containsAllDay(rect.event) || hasEvent
             }
         }
         return hasEvent
@@ -702,7 +697,7 @@ class WeekHeaderView : View {
      * @param event The event to cache.
      */
     private fun cacheEvent(event: WeekViewEvent) {
-        if (event.startTime >= event.endTime) return
+        if (event.drawStartTime >= event.drawEndTime) return
         mEventRects.add(EventRect(event, event, null))
     }
 
@@ -714,12 +709,12 @@ class WeekHeaderView : View {
     private fun sortAndCacheEvents(events: MutableList<WeekViewEvent>?) {
         events.takeIf { !it.isNullOrEmpty() }?.run {
             sortWith { event1, event2 ->
-                val start1 = event1.startTime.timeInMillis
-                val start2 = event2.startTime.timeInMillis
+                val start1 = event1.drawStartTime.timeInMillis
+                val start2 = event2.drawStartTime.timeInMillis
                 var comparator = start1.compareTo(start2)
                 if (comparator == 0) {
-                    val end1 = event1.endTime.timeInMillis
-                    val end2 = event2.endTime.timeInMillis
+                    val end1 = event1.drawEndTime.timeInMillis
+                    val end2 = event2.drawEndTime.timeInMillis
                     comparator = end1.compareTo(end2)
                 }
                 comparator
@@ -797,10 +792,10 @@ class WeekHeaderView : View {
                 if (row.size >= i + 1) {
                     val eventRect = row[i]
                     eventRect.width = allDaysBetween(
-                        eventRect.event.startTime, eventRect.event.endTime
+                        eventRect.event.drawStartTime, eventRect.event.drawEndTime
                     ) * (mWidthPerDay + mColumnGap)
                     eventRect.left = mHeaderColumnWidth + allDaysBetween(
-                        today(), eventRect.event.startTime
+                        today(), eventRect.event.drawStartTime
                     ) * (mWidthPerDay + mColumnGap)
                     if (eventRect.event.isAllDay) {
                         eventRect.top = mNormalHeaderHeight + j * allDayEventHeight
@@ -821,10 +816,10 @@ class WeekHeaderView : View {
      * @return true if the events overlap.
      */
     private fun isEventsCollide(event1: WeekViewEvent, event2: WeekViewEvent): Boolean {
-        val start1 = event1.startTime.timeInMillis
-        val end1 = event1.endTime.timeInMillis
-        val start2 = event2.startTime.timeInMillis
-        val end2 = event2.endTime.timeInMillis
+        val start1 = event1.drawStartTime.timeInMillis
+        val end1 = event1.drawEndTime.timeInMillis
+        val start2 = event2.drawStartTime.timeInMillis
+        val end2 = event2.drawEndTime.timeInMillis
         return !(start1 >= end2 || end1 <= start2)
     }
 

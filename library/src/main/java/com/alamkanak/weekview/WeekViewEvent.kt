@@ -68,13 +68,17 @@ fun TextView.withTextStyle(event: WeekViewEvent) {
     val pastEvent = event.endTime < Calendar.getInstance()
     paintFlags = when (event.status) {
         WeekViewEvent.Status.CONFIRMED, WeekViewEvent.Status.TENTATIVE -> {
-            setTextColor(if (pastEvent) setAlphaComponent(event.textColors[0], 0x66)
-            else event.textColors[0])
+            setTextColor(
+                if (pastEvent) setAlphaComponent(event.textColors[0], 0x66)
+                else event.textColors[0]
+            )
             paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
         }
         WeekViewEvent.Status.CANCELED -> {
-            setTextColor(if (pastEvent) setAlphaComponent(event.textColors[1], 0x66)
-            else event.textColors[1])
+            setTextColor(
+                if (pastEvent) setAlphaComponent(event.textColors[1], 0x66)
+                else event.textColors[1]
+            )
             paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
         }
     }
@@ -92,9 +96,18 @@ class WeekViewEvent {
     var id: Long = 0
     lateinit var startTime: Calendar
     lateinit var endTime: Calendar
+    lateinit var drawStartTime: Calendar
+    lateinit var drawEndTime: Calendar
     var name: String = ""
     var location: String = ""
     var isAllDay = false
+        set(value) {
+            field = value
+            if (value) {
+                drawStartTime.trimOfDay()
+                drawEndTime.trimOfDay()
+            }
+        }
 
     var status: Status = Status.TENTATIVE
     var baseBgColor = 0
@@ -135,21 +148,23 @@ class WeekViewEvent {
         endMinute: Int
     ) {
         this.id = id
-        startTime = Calendar.getInstance().apply {
+        this.name = name
+        this.startTime = Calendar.getInstance().apply {
             set(Calendar.YEAR, startYear)
             set(Calendar.MONTH, startMonth - 1)
             set(Calendar.DAY_OF_MONTH, startDay)
             set(Calendar.HOUR_OF_DAY, startHour)
             set(Calendar.MINUTE, startMinute)
         }
-        endTime = Calendar.getInstance().apply {
+        this.drawStartTime = startTime.clone() as Calendar
+        this.endTime = Calendar.getInstance().apply {
             set(Calendar.YEAR, endYear)
             set(Calendar.MONTH, endMonth - 1)
             set(Calendar.DAY_OF_MONTH, endDay)
             set(Calendar.HOUR_OF_DAY, endHour)
             set(Calendar.MINUTE, endMinute)
         }
-        this.name = name
+        this.drawEndTime = endTime.clone() as Calendar
     }
 
     /**
@@ -176,7 +191,9 @@ class WeekViewEvent {
         this.location = location ?: ""
         this.startTime = startTime
         this.endTime = endTime
-        isAllDay = allDay
+        this.drawStartTime = startTime.clone() as Calendar
+        this.drawEndTime = endTime.clone() as Calendar
+        this.isAllDay = allDay
     }
 
     /**

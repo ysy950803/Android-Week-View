@@ -18,7 +18,7 @@ import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 @SuppressLint("ClickableViewAccessibility")
-class WeekViewLayout @JvmOverloads constructor(
+class MultiWeekViewLayout @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
@@ -37,7 +37,7 @@ class WeekViewLayout @JvmOverloads constructor(
     private var mFetchedPeriod = -1 // the middle period the calendar has fetched.
 
     init {
-        inflate(context, R.layout.wv_layout_week_view, this)
+        inflate(context, R.layout.wv_layout_multi_week_view, this)
     }
 
     override fun onAttachedToWindow() {

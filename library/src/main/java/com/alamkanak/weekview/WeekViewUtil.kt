@@ -12,7 +12,33 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.ceil
 
+fun View.performPressVibrate() {
+    this.performHapticFeedback(
+        HapticFeedbackConstants.LONG_PRESS,
+        HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+    )
+}
+
+fun Calendar.trimOfDay() {
+    this[Calendar.HOUR_OF_DAY] = 0
+    this[Calendar.MINUTE] = 0
+    this[Calendar.SECOND] = 0
+    this[Calendar.MILLISECOND] = 0
+}
+
+fun Calendar.containsAllDay(event: WeekViewEvent) = event.isAllDay
+    && this.timeInMillis < event.drawEndTime.timeInMillis
+    && event.drawStartTime.timeInMillis <= this.timeInMillis
+
 object WeekViewUtil {
+
+    @JvmStatic
+    fun calculateDiffDay(a: Calendar, b: Calendar): Int = kotlin.runCatching {
+        val diff = (b.timeInMillis + b.timeZone.getOffset(b.timeInMillis)
+            - (a.timeInMillis + a.timeZone.getOffset(a.timeInMillis)))
+        val day = diff / TimeUnit.DAYS.toMillis(1)
+        day.toInt()
+    }.getOrDefault(-1)
 
     /**
      * Checks if two times are on the same day.
@@ -23,7 +49,8 @@ object WeekViewUtil {
      */
     @JvmStatic
     fun isSameDay(dayOne: Calendar, dayTwo: Calendar): Boolean {
-        return dayOne[Calendar.YEAR] == dayTwo[Calendar.YEAR] && dayOne[Calendar.DAY_OF_YEAR] == dayTwo[Calendar.DAY_OF_YEAR]
+        return dayOne[Calendar.YEAR] == dayTwo[Calendar.YEAR]
+            && dayOne[Calendar.DAY_OF_YEAR] == dayTwo[Calendar.DAY_OF_YEAR]
     }
 
     /**
@@ -48,21 +75,9 @@ object WeekViewUtil {
             / TimeUnit.DAYS.toMillis(1)).toDouble()
     ).toInt()
 
-    @JvmStatic
-    fun isContainsAllDay(day: Calendar, event: WeekViewEvent) =
-        day.timeInMillis <= event.endTime.timeInMillis && event.startTime.timeInMillis <= day.timeInMillis && event.isAllDay
-
     // 忽略float误差，避免UI联动滑动细微晃动
     @JvmStatic
     fun isFloatEqual(a: Float, b: Float) = abs(a - b) < 1f
-
-    @JvmStatic
-    fun performPressVibrate(view: View) {
-        view.performHapticFeedback(
-            HapticFeedbackConstants.LONG_PRESS,
-            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-        )
-    }
 
     @JvmStatic
     fun obtainStaticLayout(
